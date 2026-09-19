@@ -1206,7 +1206,8 @@ h1 {
   border-top: 1px solid var(--line-soft);
   border-bottom: 1px solid var(--line-soft);
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 10px;
   padding: 11px 0;
   margin: auto 18px 13px;
 }
@@ -1796,6 +1797,28 @@ h1 {
 }
 .risk-results {
   margin-top: 30px;
+}
+.account-context {
+  padding: 0 0 18px;
+  margin-top: 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+.sizing-status {
+  display: grid;
+  gap: 6px;
+  padding: 14px 0;
+  margin: 14px 0 0;
+  border-block: 1px solid var(--line-soft);
+  color: var(--secondary);
+  font-size: 11px;
+  line-height: 1.6;
+}
+.sizing-status strong {
+  font-weight: 500;
+}
+.field-note a {
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 .risk-results > div {
   display: flex;

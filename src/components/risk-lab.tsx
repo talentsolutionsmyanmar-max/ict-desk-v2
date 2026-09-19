@@ -7,9 +7,17 @@ import {
   CircleHelp,
   ShieldCheck,
 } from "lucide-react";
-import { floorQuantity, tradeMath } from "@/lib/math";
+import { tradeMath } from "@/lib/math";
+import {
+  DEFAULT_RISK_PERCENT,
+  MIN_PERP_NOTIONAL,
+  SMALL_ACCOUNT_EQUITY,
+  sizeScenario,
+} from "@/lib/sizing";
 import { Market, Plan } from "@/lib/types";
 import { money } from "@/lib/format";
+
+const readNumber = (value: string) => (value.trim() ? Number(value) : NaN);
 
 export function RiskLab({
   market,
@@ -23,8 +31,8 @@ export function RiskLab({
     plan?.direction ?? "long",
   );
   const [values, setValues] = useState({
-    equity: "10000",
-    risk: "0.25",
+    equity: String(SMALL_ACCOUNT_EQUITY),
+    risk: String(DEFAULT_RISK_PERCENT),
     entry: initial ? String(initial) : "",
     stop: plan ? String(plan.stop) : "",
     target: plan ? String(plan.target) : "",
@@ -50,34 +58,45 @@ export function RiskLab({
       />
     </label>
   );
+  const costs = {
+    entryFeeBps: readNumber(values.entryFee),
+    exitFeeBps: readNumber(values.exitFee),
+    slippageBps: readNumber(values.slippage),
+    fundingBps: readNumber(values.funding),
+  };
   const math = tradeMath(
-    Number(values.entry),
-    Number(values.stop),
-    Number(values.target),
+    readNumber(values.entry),
+    readNumber(values.stop),
+    readNumber(values.target),
     direction,
-    {
-      entryFeeBps: Number(values.entryFee),
-      exitFeeBps: Number(values.exitFee),
-      slippageBps: Number(values.slippage),
-      fundingBps: Number(values.funding),
-    },
+    costs,
   );
-  const equity = Number(values.equity);
-  const riskPercent = Number(values.risk);
+  const equity = readNumber(values.equity);
+  const riskPercent = readNumber(values.risk);
   const settingsValid =
     Number.isFinite(equity) &&
     equity > 0 &&
+    Number.isFinite(riskPercent) &&
     riskPercent > 0 &&
     riskPercent <= 1 &&
     Object.values(values).every((v) => v.trim() !== "");
   const budget = (equity * riskPercent) / 100;
-  const quantity =
-    settingsValid && math.valid
-      ? floorQuantity(
-          Math.min(budget / math.netLoss, equity / Number(values.entry)),
-          market?.szDecimals ?? 4,
-        )
-      : 0;
+  const sizing = sizeScenario({
+    equity: settingsValid ? equity : NaN,
+    riskPercent,
+    entry: readNumber(values.entry),
+    math,
+    szDecimals: market?.szDecimals,
+  });
+  const quantity = sizing.quantity;
+  const stressBps = Math.max(50, costs.slippageBps);
+  const stress = tradeMath(
+    readNumber(values.entry),
+    readNumber(values.stop),
+    readNumber(values.target),
+    direction,
+    { ...costs, slippageBps: stressBps },
+  );
   const qualifies = math.valid && math.netRR >= 2;
   const example = () => {
     const entry = market?.mark ?? initial;
@@ -114,6 +133,11 @@ export function RiskLab({
             </h2>
           </div>
           <div className="risk-form">
+            <p className="field-note account-context">
+              Small-account default: $100 equity, 0.25% planned risk ($0.25).
+              Hypothetical sizing only—no account balance or available margin is
+              connected.
+            </p>
             <div className="segmented">
               <button
                 onClick={() => setDirection("long")}
@@ -137,6 +161,13 @@ export function RiskLab({
               {field("stop", "Initial stop", "USD")}
               {field("target", "Target price", "USD")}
             </div>
+            {plan && (
+              <p className="field-note">
+                Imported levels are a fixed snapshot, not a live order. Recheck
+                all 10 gates and candidate freshness on the market desk before
+                use.
+              </p>
+            )}
             <button className="text-button" onClick={example}>
               Load an illustrative 3R scenario ↗
             </button>
@@ -159,6 +190,18 @@ export function RiskLab({
               allowance. Use your actual fee tier. Future funding and slippage
               are unknown.
             </p>
+            <p className="field-note">
+              Hyperliquid native perpetuals only. A limit order is not
+              necessarily a maker fill; use post-only or budget your actual
+              taker fee. Minimum entry notional: ${MIN_PERP_NOTIONAL}.{" "}
+              <a
+                href="https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/error-responses"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Venue rules ↗
+              </a>
+            </p>
           </div>
         </div>
         <div className="risk-output">
@@ -175,6 +218,19 @@ export function RiskLab({
                   : "Below the research RR floor"
                 : "Enter entry, stop and target"}
             </span>
+            {settingsValid && math.valid && (
+              <p
+                className={`sizing-status ${sizing.meetsMinimum ? "" : "negative"}`}
+                role="status"
+              >
+                <strong>
+                  {sizing.meetsMinimum
+                    ? "Minimum-size check passes"
+                    : "Size blocked"}
+                </strong>
+                {sizing.reason}
+              </p>
+            )}
             <div className="risk-results">
               <div>
                 <span>Gross reward / risk</span>
@@ -197,7 +253,7 @@ export function RiskLab({
                 <strong>{settingsValid ? `$${money(budget)}` : "—"}</strong>
               </div>
               <div>
-                <span>Risk-sized quantity</span>
+                <span>Hypothetical quantity · rounded down</span>
                 <strong>
                   {quantity > 0
                     ? `${quantity} ${market?.coin ?? "units"}`
@@ -205,26 +261,44 @@ export function RiskLab({
                 </strong>
               </div>
               <div>
-                <span>Notional · capped at 1× equity</span>
+                <span>Notional · 1× cap with cost reserve</span>
                 <strong>
-                  {quantity > 0
-                    ? `$${money(quantity * Number(values.entry))}`
-                    : "—"}
+                  {quantity > 0 ? `$${money(sizing.notional)}` : "—"}
                 </strong>
               </div>
               <div>
                 <span>Estimated target P&L</span>
-                <strong className="positive">
-                  {quantity > 0 ? `$${money(math.netReward * quantity)}` : "—"}
+                <strong
+                  className={
+                    sizing.estimatedTargetPnl >= 0 ? "positive" : "negative"
+                  }
+                >
+                  {quantity > 0 ? `$${money(sizing.estimatedTargetPnl)}` : "—"}
                 </strong>
               </div>
               <div>
                 <span>Estimated stop loss</span>
                 <strong className="negative">
-                  {quantity > 0 ? `−$${money(math.netLoss * quantity)}` : "—"}
+                  {quantity > 0 ? `−$${money(sizing.estimatedStopLoss)}` : "—"}
+                </strong>
+              </div>
+              <div>
+                <span>
+                  Stop loss with {Number.isFinite(stressBps) ? stressBps : "—"}{" "}
+                  bps exit slippage
+                </span>
+                <strong className="negative">
+                  {quantity > 0 && stress.valid
+                    ? `−$${money(stress.netLoss * quantity)}`
+                    : "—"}
                 </strong>
               </div>
             </div>
+            <p className="field-note">
+              Slippage stress uses the same quantity and at least 50 bps (0.5%)
+              adverse exit slippage. It is an illustrative scenario, not a
+              forecast or worst-case loss. Actual losses can be larger.
+            </p>
             {values.stop && values.target && !math.valid && (
               <p className="form-error" role="alert">
                 {math.error}
@@ -242,10 +316,13 @@ export function RiskLab({
             <div>
               <strong>A calculator is not a trading signal.</strong>
               <p>
-                These are estimates, not maximum possible losses. Stops can
-                slip. Quantity is rounded down and capped at unlevered notional;
-                check venue minimums and available margin. Break-even assumes
-                only full target or full stop outcomes, not a measured win rate.
+                These are estimates, not maximum possible losses. Stops can slip
+                or fail to fill. Quantity is rounded down, with modeled costs
+                reserved inside a 1× capital cap. A minimum-size pass does not
+                check actual margin, live eligibility or profitability.
+                Protective orders must be managed on your exchange; this desk
+                does not place them. Break-even assumes only full target or full
+                stop outcomes, not a measured win rate.
               </p>
             </div>
           </div>

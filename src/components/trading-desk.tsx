@@ -738,8 +738,12 @@ export function TradingDesk() {
                         <strong>{plan ? price(plan.entry) : "—"}</strong>
                       </div>
                       <div>
-                        <span>Stop</span>
+                        <span>Stop loss</span>
                         <strong>{plan ? price(plan.stop) : "—"}</strong>
+                      </div>
+                      <div>
+                        <span>Take profit · 3R gross</span>
+                        <strong>{plan ? price(plan.target) : "—"}</strong>
                       </div>
                       <div>
                         <span>Net RR</span>
@@ -753,7 +757,11 @@ export function TradingDesk() {
                       onClick={() => openRisk(plan)}
                     >
                       <ShieldCheck size={15} />
-                      {plan ? "Review candidate risk" : "Open risk calculator"}
+                      {plan
+                        ? eligible
+                          ? "Review candidate risk"
+                          : "Inspect filtered scenario"
+                        : "Open risk calculator"}
                       <ArrowRight size={15} />
                     </button>
                     <p className="setup-footnote">
