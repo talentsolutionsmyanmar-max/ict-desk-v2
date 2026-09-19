@@ -29,10 +29,20 @@ target_cost = entry × (entry_fee_bps + funding_bps) / 10,000
 stop_cost   = entry × (entry_fee_bps + funding_bps) / 10,000
             + stop × (exit_fee_bps + exit_slippage_bps) / 10,000
 net_RR      = (G − target_cost) / (D + stop_cost)
-quantity    = floor_to_lot(min(risk_budget / (D + stop_cost), equity / entry))
+quantity    = floor_to_lot(min(risk_budget / (D + stop_cost), equity / (entry + stop_cost)))
 ```
 
-The second sizing bound caps the calculator at 1× reference equity. It does not promise a fill or validate the broker's minimum order/margin constraints.
+The second sizing bound keeps entry notional plus modeled stop-side execution costs inside reference equity. It does not promise a fill or verify actual available margin.
+
+### Small-account planning
+
+The calculator defaults to **$100 reference equity and 0.25% planned risk**, an estimated $0.25 risk budget, not a maximum possible loss or a live account balance. All account values remain user-entered scenarios. The strategy gates and 3R hypothesis are unchanged.
+
+Native Hyperliquid perpetual entry notional must be at least **$10**, per the [documented order errors](https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/error-responses), checked September 19, 2026. Check this minimum **after** quantity rounding; do not round up to manufacture feasibility. Missing venue size precision blocks sizing instead of assuming four decimals. A passing size check is not a trading signal, margin verification, or proof of an edge. Other venues and spot markets require different validation.
+
+The calculator also shows stop loss at the same quantity with `max(input_slippage_bps, 50)` adverse exit bps. The 50 bps stress is an illustrative assumption, not a calibrated percentile or worst-case bound. Actual losses can be larger. Hyperliquid [TP/SL documentation](https://hyperliquid.gitbook.io/hyperliquid-docs/trading/take-profit-and-stop-loss-orders-tp-sl) specifies mark-price triggers, warns that limit stops may not fill, and describes parent-order/partial-fill protection behavior. The dashboard neither creates nor checks protective orders.
+
+Imported Entry / SL / TP values are fixed calculation inputs, not a persistent order or live-updating eligibility check. Recheck all ten gates and freshness on the desk. Below-minimum scenarios retain their hypothetical values for inspection but are explicitly blocked; they are never represented as executable orders.
 
 For completed trades, initial price-risk `1R = quantity × |entry − original stop|`. Net P&L is direction-adjusted exit less entry, multiplied by quantity, minus actual fees and funding paid. Received funding is negative cost. Realized net R uses the original price-risk denominator, not the larger cost-inclusive sizing denominator. A stopped trade can therefore lose more than 1R. R, price basis points and account return are different quantities; the desk never labels R as bps.
 

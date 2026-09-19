@@ -9,7 +9,8 @@ A live, single-venue crypto research workspace built with Next.js, React, TypeSc
 - Execution-quality filters for volume, open interest, spread, observed depth, funding and venue OI caps. Liquidity qualification is distinct from an entry signal.
 - Versioned, closed-candle ICT continuation research logic with confirmed pivots, sweep/reclaim, displacement, first-retest freshness, local range alignment, structural target room and cost-adjusted RR.
 - A transparent checklist: each gate exposes its reason. Stale quotes, incomplete candles, missing data and closed entry windows block actionable eligibility.
-- A cost-aware scenario calculator with explicit fee/slippage/funding assumptions, conservative quantity rounding and a 1× reference-equity notional cap.
+- A cost-aware scenario calculator defaulting to $100 equity and 0.25% planned risk, with explicit fee/slippage/funding assumptions, conservative quantity rounding, a 1× capital cap including modeled costs, a post-rounding $10 native-perpetual minimum check, and an illustrative exit-slippage stress. No account is connected.
+- Numeric Entry / Stop loss / Take profit beside the chart. A displayed level or passing size check is not sufficient: all ten live entry gates must pass for a research candidate.
 - Browser-local watchlist and manually recorded closed-trade journal. Journal P&L and realized R derive from actual entered prices, quantity and costs, never Win/Loss buttons. CSV export is available.
 - Responsive dark trading workspace, accessible input labels, keyboard search (`/`), chart data table and reduced-motion support.
 
