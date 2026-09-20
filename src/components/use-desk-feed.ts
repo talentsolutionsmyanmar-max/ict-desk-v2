@@ -1,6 +1,12 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  contextMetrics,
+  createContextTape,
+  recordAssetContext,
+  recordTrades,
+} from "@/lib/market-context";
+import {
   Book,
   Candle,
   Interval,
@@ -23,6 +29,7 @@ export function useDeskFeed(coin: string, interval: Interval) {
   const [chartError, setChartError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [now, setNow] = useState(0);
+  const contextTape = useRef(createContextTape(coin, 0));
   const refreshLock = useRef(false);
   const mounted = useRef(true);
   const controllers = useRef(new Set<AbortController>());
@@ -109,6 +116,8 @@ export function useDeskFeed(coin: string, interval: Interval) {
     setChartError(null);
     setMids({});
     setLastMessage(0);
+    contextTape.current = createContextTape(coin, Date.now());
+    contextTape.current.connected = false;
     const loadCandles = async () => {
       if (loading || document.hidden) return;
       loading = true;
@@ -147,9 +156,12 @@ export function useDeskFeed(coin: string, interval: Interval) {
       socket.onopen = () => {
         if (!socket || cancelled) return;
         failures = 0;
+        contextTape.current = createContextTape(coin, Date.now());
         for (const subscription of [
           { type: "allMids" },
           { type: "l2Book", coin },
+          { type: "activeAssetCtx", coin },
+          { type: "trades", coin },
           { type: "candle", coin, interval },
           ...(interval === "5m"
             ? []
@@ -162,6 +174,10 @@ export function useDeskFeed(coin: string, interval: Interval) {
         try {
           const message = JSON.parse(event.data);
           const receivedAt = Date.now();
+          if (message.channel === "activeAssetCtx")
+            recordAssetContext(contextTape.current, message.data, receivedAt);
+          if (message.channel === "trades")
+            recordTrades(contextTape.current, message.data, receivedAt);
           if (message.channel === "allMids" && message.data?.mids) {
             const next: Record<string, number> = {};
             for (const [name, value] of Object.entries(message.data.mids)) {
@@ -238,7 +254,9 @@ export function useDeskFeed(coin: string, interval: Interval) {
       };
       socket.onerror = () => socket?.close();
       socket.onclose = () => {
-        if (cancelled || document.hidden) return;
+        if (cancelled) return;
+        contextTape.current.connected = false;
+        if (document.hidden) return;
         setStatus("reconnecting");
         failures++;
         retry = setTimeout(
@@ -250,6 +268,7 @@ export function useDeskFeed(coin: string, interval: Interval) {
     const visible = () => {
       clearTimeout(retry);
       if (document.hidden) {
+        contextTape.current.connected = false;
         setStatus("paused");
         socket?.close();
       } else {
@@ -291,5 +310,9 @@ export function useDeskFeed(coin: string, interval: Interval) {
     refreshing,
     refresh,
     now,
+    context:
+      contextTape.current.coin === coin
+        ? contextMetrics(contextTape.current, now)
+        : contextMetrics(createContextTape(coin, now), now),
   };
 }

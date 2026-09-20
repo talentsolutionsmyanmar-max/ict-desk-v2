@@ -1,4 +1,5 @@
 import { analyze, blockedAnalysis, STRATEGY_VERSION } from "./strategy";
+import { analyzeResearch, RESEARCH_VERSION } from "./research-strategy";
 import {
   Book,
   Candle,
@@ -178,6 +179,7 @@ export async function getMarkets(): Promise<MarketSnapshot> {
             ? (mark / previous - 1) * 100
             : null,
         openInterestUsd: oi === null ? null : oi * mark,
+        openInterestBase: oi,
         fundingHourly: num(context.funding),
         capped: capStatusKnown ? caps.has(coin) : null,
       });
@@ -268,6 +270,11 @@ export async function getScan(): Promise<ScanSnapshot> {
                 { five, fifteen, fourHour, book },
                 Date.now(),
               );
+              analyses[i].research = analyzeResearch(
+                m,
+                { five, fifteen, fourHour, book },
+                analyses[i].evaluatedAt,
+              );
             } catch {
               errors.push(m.coin);
               analyses[i] = blockedAnalysis(m.coin, Date.now());
@@ -286,6 +293,7 @@ export async function getScan(): Promise<ScanSnapshot> {
         universeCount: snapshot.markets.length,
         analyzedCount: universe.length,
         strategyVersion: STRATEGY_VERSION,
+        researchVersion: RESEARCH_VERSION,
         errors,
       };
     },

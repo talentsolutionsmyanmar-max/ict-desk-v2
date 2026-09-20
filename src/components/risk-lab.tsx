@@ -164,8 +164,9 @@ export function RiskLab({
             {plan && (
               <p className="field-note">
                 Imported levels are a fixed snapshot, not a live order. Recheck
-                all 10 gates and candidate freshness on the market desk before
-                use.
+                the originating model’s conditions, live freshness and account
+                risk on the market desk before use. V3 models are independent;
+                the ten-gate checklist belongs only to the V2.1 baseline.
               </p>
             )}
             <button className="text-button" onClick={example}>

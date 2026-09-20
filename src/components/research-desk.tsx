@@ -1,0 +1,337 @@
+"use client";
+import { useEffect, useState } from "react";
+import { Activity, ArrowRight, FlaskConical } from "lucide-react";
+import { Book, Candle, Market, Plan, ResearchModel } from "@/lib/types";
+import { ContextMetrics } from "@/lib/market-context";
+import { researchLifecycle } from "@/lib/research-strategy";
+import { quoteFresh, RULES } from "@/lib/strategy";
+import { price, pct, compact } from "@/lib/format";
+import { tradeMath } from "@/lib/math";
+import {
+  sizeScenario,
+  SMALL_ACCOUNT_EQUITY,
+  DEFAULT_RISK_PERCENT,
+} from "@/lib/sizing";
+
+const label = {
+  watching: "Watching",
+  candidate: "Research candidate",
+  filtered: "Economics filtered",
+  passed: "Retest passed",
+  expired: "Expired",
+  blocked: "Data / execution blocked",
+};
+const myanmarTime = (time: number) =>
+  new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Yangon",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).format(time);
+
+export function ResearchDesk({
+  coin,
+  market,
+  models,
+  context,
+  book,
+  signalCandle,
+  now,
+  dataReady,
+  onRisk,
+}: {
+  coin: string;
+  market?: Market;
+  models?: ResearchModel[];
+  context: ContextMetrics;
+  book: Book | null;
+  signalCandle: Candle | null;
+  now: number;
+  dataReady: boolean;
+  onRisk: (plan: Plan) => void;
+}) {
+  const [touched, setTouched] = useState<string[]>([]);
+  const observed = (models ?? [])
+    .filter(
+      (m) =>
+        book?.coin === coin &&
+        m.plan &&
+        researchLifecycle(
+          m.plan,
+          signalCandle ? [signalCandle] : [],
+          book,
+          now,
+        ) === "passed",
+    )
+    .map((m) => m.plan!.id);
+  const touchKey = observed.join("|");
+  useEffect(() => {
+    if (touchKey)
+      setTouched((previous) =>
+        [...new Set([...previous, ...touchKey.split("|")])].slice(-300),
+      );
+  }, [touchKey]);
+  const liveData = dataReady && book?.coin === coin && quoteFresh(book, now);
+  const liveExecution =
+    !!book &&
+    book.spreadBps <= RULES.maxSpreadBps &&
+    Math.min(book.bidDepth10bps, book.askDepth10bps) >= RULES.minDepth;
+  const liveQuality = liveData && liveExecution;
+  const depthTotal = book ? book.bidDepth10bps + book.askDepth10bps : 0;
+  const bidShare =
+    book?.coin === coin && quoteFresh(book, now) && depthTotal > 0
+      ? (book!.bidDepth10bps / depthTotal) * 100
+      : null;
+  return (
+    <section className="panel research-desk" aria-labelledby="research-title">
+      <div className="research-heading">
+        <div>
+          <div className="eyebrow">V3 · SHADOW RESEARCH · {coin} PERPETUAL</div>
+          <h2 id="research-title">
+            <FlaskConical size={19} /> Three models. Different market
+            conditions.
+          </h2>
+          <p>
+            24/7 evaluation. Session and 4h bias are context—not a blanket
+            short-entry veto. No calibrated win probability or proven edge.
+          </p>
+        </div>
+        <span className="research-mode">No orders · no automatic alerts</span>
+      </div>
+      <div className="context-grid" aria-label="Live positioning context">
+        <div>
+          <span>Open interest · observed base-unit change</span>
+          <strong>
+            {context.oiUsd === null ? "—" : `$${compact(context.oiUsd)}`}
+          </strong>
+          <small>
+            5m {pct(context.oiChange5m)} · 15m {pct(context.oiChange15m)}
+          </small>
+        </div>
+        <div>
+          <span>Observed signed trade flow · 5m</span>
+          <strong>
+            {context.signedFlow5m === null
+              ? "—"
+              : `${context.signedFlow5m >= 0 ? "+" : "−"}$${compact(Math.abs(context.signedFlow5m))}`}
+          </strong>
+          <small>
+            {context.flowIncomplete
+              ? "Incomplete tape · value withheld"
+              : context.signedFlow5m === null
+                ? "Needs 5 uninterrupted minutes in this tab"
+                : `${context.observedTrades.toLocaleString()} observed trades · B minus A notional`}
+          </small>
+        </div>
+        <div>
+          <span>Funding / hour · mark premium</span>
+          <strong>
+            {context.funding === null ? "—" : pct(context.funding * 100, 4)}
+          </strong>
+          <small>
+            Premium{" "}
+            {context.premium === null ? "—" : pct(context.premium * 100, 3)}
+          </small>
+        </div>
+        <div>
+          <span>Observed depth · bid share</span>
+          <strong>{bidShare === null ? "—" : `${bidShare.toFixed(1)}%`}</strong>
+          <div
+            className={`depth-balance ${bidShare === null ? "depth-unavailable" : ""}`}
+            role="img"
+            aria-label={
+              bidShare === null
+                ? "Depth unavailable"
+                : `Bid ${bidShare.toFixed(1)} percent, ask ${(100 - bidShare).toFixed(1)} percent of observed depth`
+            }
+          >
+            {bidShare !== null && <i style={{ width: `${bidShare}%` }} />}
+          </div>
+          <small>±10 bps · up to 20 levels/side · cancelable orders</small>
+        </div>
+      </div>
+      <p className="context-note">
+        <Activity size={13} /> OI change uses contract/base units, not
+        price-driven USD change. These are supporting observations, not extra
+        entry gates. Warm-up resets on reconnect; hidden tabs pause observation.
+      </p>
+      <div className="research-models">
+        {models?.length ? (
+          models.map((model) => {
+            const plan = model.plan;
+            const lifecycle = plan
+              ? researchLifecycle(
+                  plan,
+                  signalCandle ? [signalCandle] : [],
+                  book,
+                  now,
+                )
+              : null;
+            const status = !liveQuality
+              ? "blocked"
+              : plan && (touched.includes(plan.id) || lifecycle === "passed")
+                ? "passed"
+                : lifecycle === "expired"
+                  ? "expired"
+                  : model.status;
+            const sizing = plan
+              ? sizeScenario({
+                  equity: SMALL_ACCOUNT_EQUITY,
+                  riskPercent: DEFAULT_RISK_PERCENT,
+                  entry: plan.entry,
+                  math: tradeMath(
+                    plan.entry,
+                    plan.stop,
+                    plan.target,
+                    plan.direction,
+                    plan.costs,
+                  ),
+                  szDecimals: market?.szDecimals,
+                })
+              : null;
+            const sizeBlocked =
+              !!sizing && (!sizing.valid || !sizing.meetsMinimum);
+            return (
+              <article
+                key={model.id}
+                className={`research-model ${status === "candidate" && !sizeBlocked ? "research-candidate" : ""}`}
+              >
+                <div className="model-title">
+                  <h3>{model.label}</h3>
+                  <span
+                    className={
+                      model.direction === "short"
+                        ? "negative"
+                        : model.direction === "long"
+                          ? "positive"
+                          : "subdued"
+                    }
+                  >
+                    {model.direction === "neutral"
+                      ? "—"
+                      : model.direction.toUpperCase()}
+                  </span>
+                </div>
+                <strong className="model-state">
+                  {status === "candidate" && sizeBlocked
+                    ? "$100 size blocked"
+                    : label[status]}
+                </strong>
+                <p>{model.trigger}</p>
+                <small>{model.context}</small>
+                <dl className="model-prices">
+                  <div>
+                    <dt>Retest entry</dt>
+                    <dd>{plan ? price(plan.entry) : "—"}</dd>
+                  </div>
+                  <div>
+                    <dt>Invalidation / SL</dt>
+                    <dd>{plan ? price(plan.stop) : "—"}</dd>
+                  </div>
+                  <div>
+                    <dt>Structural TP</dt>
+                    <dd>{plan ? price(plan.target) : "—"}</dd>
+                  </div>
+                  <div>
+                    <dt>Estimated net RR</dt>
+                    <dd>{plan ? `${plan.netRR.toFixed(2)}R` : "—"}</dd>
+                  </div>
+                </dl>
+                <p className="model-explanation">
+                  {status === "blocked"
+                    ? "Awaiting current market data and execution checks."
+                    : status === "passed"
+                      ? "Retest already observed. Do not chase; no fill is assumed."
+                      : status === "expired"
+                        ? "Retest window ended. Shown levels are a historical scenario."
+                        : model.summary}
+                </p>
+                {plan && (
+                  <small>
+                    Confirmed {myanmarTime(plan.formedAt)} · expires{" "}
+                    {myanmarTime(plan.expiresAt)} MMT. Frozen scenario, not an
+                    order.
+                  </small>
+                )}
+                {sizing && (
+                  <p className="model-sizing">
+                    $100 reference / 0.25% planned risk:{" "}
+                    {sizeBlocked
+                      ? sizing.reason
+                      : `$${sizing.notional.toFixed(2)} notional · $${sizing.estimatedStopLoss.toFixed(2)} modeled loss. Actual loss can exceed this.`}
+                  </p>
+                )}
+                <details>
+                  <summary>Why this model is waiting or qualified</summary>
+                  <ul>
+                    {model.gates.map((g) => (
+                      <li key={g.id}>
+                        <strong>
+                          {g.label}:{" "}
+                          {g.id === "data" && !liveData
+                            ? "blocked live"
+                            : g.id === "liquidity" && !liveExecution
+                              ? "blocked live"
+                              : g.id === "lifecycle" &&
+                                  (status === "passed" || status === "expired")
+                                ? status === "passed"
+                                  ? "retest passed"
+                                  : "expired"
+                                : g.status}
+                        </strong>
+                        <span>{g.detail}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+                {plan && (
+                  <button
+                    className="button secondary-button"
+                    onClick={() => onRisk(plan)}
+                  >
+                    Inspect{" "}
+                    {status === "candidate" && !sizeBlocked
+                      ? "candidate"
+                      : "filtered / historical"}{" "}
+                    risk <ArrowRight size={13} />
+                  </button>
+                )}
+              </article>
+            );
+          })
+        ) : (
+          <p className="research-empty">
+            {models
+              ? "No model observations available."
+              : "Waiting for the model scan. No setup is inferred from price alone."}
+          </p>
+        )}
+      </div>
+      <details className="research-limits">
+        <summary>Data coverage and what is not connected</summary>
+        <p>
+          Public Hyperliquid activeAssetCtx, trades and L2 book only. OI history
+          and trade flow start when this selected market connects; they are not
+          yesterday’s history. Signed flow is not exchange deposits/withdrawals
+          and cannot identify whether positions opened or closed. Book depth is
+          not a liquidation heatmap.
+        </p>
+        <p>
+          Liquidation heatmaps, attributed exchange inflow/outflow, durable
+          signal history and always-on alerts are not connected. Missing data is
+          not treated as neutral confirmation. No wallet or trading API is
+          connected.
+        </p>
+        <a
+          href="https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/websocket/subscriptions"
+          target="_blank"
+          rel="noreferrer"
+        >
+          Hyperliquid source and coverage ↗
+        </a>
+      </details>
+    </section>
+  );
+}

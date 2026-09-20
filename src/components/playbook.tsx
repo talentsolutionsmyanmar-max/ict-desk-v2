@@ -57,7 +57,7 @@ export function Playbook() {
           </p>
         </div>
         <span className="pill muted">
-          <GitBranch size={13} /> v2.1 · research
+          <GitBranch size={13} /> v3 shadow + v2.1 baseline
         </span>
       </div>
       <div className="playbook-intro panel">
@@ -81,6 +81,30 @@ export function Playbook() {
           </span>
         </div>
       </div>
+      <div className="playbook-intro panel">
+        <div>
+          <span className="eyebrow">V3 · THREE INDEPENDENT MODELS · 24/7</span>
+          <h2>Context is not a universal veto.</h2>
+        </div>
+        <div>
+          <p>
+            Trend continuation trades a confirmed 15m swing break in the 4h
+            direction. Break &amp; retest evaluates a break against, or without,
+            that trend. Sweep reversal requires a reclaimed 15m swing followed
+            by a break of the pre-sweep 5m swing. No FVG or New York window is
+            required for V3.
+          </p>
+          <p>
+            All use closed-bar displacement, a first retest at the broken swing,
+            a buffered structural stop and a 30-minute expiry. Target room is
+            frozen at confirmation, capped at 4R gross, and must provide at
+            least 2R estimated net. OI change, signed trade flow, funding and
+            depth are separately labeled context, not a confidence score. These
+            hypotheses have no validated expectancy.
+          </p>
+        </div>
+      </div>
+      <h2>V2.1 comparison baseline</h2>
       <div className="playbook-grid">
         {steps.map(([number, title, subtitle, body]) => (
           <article className="panel playbook-step" key={number}>

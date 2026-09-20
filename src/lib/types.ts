@@ -23,6 +23,7 @@ export interface Market {
   change24h: number | null;
   volume24h: number | null;
   openInterestUsd: number | null;
+  openInterestBase?: number | null;
   fundingHourly: number | null;
   capped: boolean | null;
 }
@@ -107,6 +108,20 @@ export interface Analysis {
   liquid: boolean;
   ready: boolean;
   session: Session;
+  research?: ResearchModel[];
+}
+export type ResearchModelId = "continuation" | "reversal" | "breakout";
+export interface ResearchModel {
+  id: ResearchModelId;
+  label: string;
+  direction: Direction;
+  status:
+    "watching" | "candidate" | "filtered" | "passed" | "expired" | "blocked";
+  summary: string;
+  trigger: string;
+  context: string;
+  gates: Gate[];
+  plan: Plan | null;
 }
 export interface Session {
   open: boolean;
@@ -120,6 +135,7 @@ export interface ScanSnapshot {
   universeCount: number;
   analyzedCount: number;
   strategyVersion: string;
+  researchVersion?: string;
   errors: string[];
 }
 export interface JournalTrade {

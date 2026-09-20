@@ -31,6 +31,8 @@ import { Analysis, Gate, INTERVAL_MS, Interval, Plan } from "@/lib/types";
 import { age, COIN_NAMES, compact, pct, price } from "@/lib/format";
 import { quoteFresh, RULES, sessionAt } from "@/lib/strategy";
 import { useDeskFeed } from "./use-desk-feed";
+import { ResearchDesk } from "./research-desk";
+import { JevContext } from "./jev-context";
 const MarketChart = dynamic(
   () => import("./market-chart").then((m) => m.MarketChart),
   {
@@ -271,6 +273,16 @@ export function TradingDesk() {
           (b.market?.change24h ?? -Infinity) -
           (a.market?.change24h ?? -Infinity),
       );
+    if (sort === "quality")
+      result = result.sort(
+        (a, b) =>
+          Number(b.analysis.research?.some((m) => m.status === "candidate")) -
+            Number(
+              a.analysis.research?.some((m) => m.status === "candidate"),
+            ) ||
+          Number(b.analysis.liquid) - Number(a.analysis.liquid) ||
+          (b.market?.volume24h ?? 0) - (a.market?.volume24h ?? 0),
+      );
     return result;
   }, [scan, markets, search, filter, sort, view, watchlist]);
   const liquidCount = scan?.analyses.filter((a) => a.liquid).length ?? 0;
@@ -351,7 +363,7 @@ export function TradingDesk() {
             <GitBranch size={15} /> View source <ExternalLink size={12} />
           </a>
           <div className="sidebar-version">
-            <span className="status-dot" /> Engine v2.1<span>PUBLIC BETA</span>
+            <span className="status-dot" /> V3 shadow<span>V2.1 BASELINE</span>
           </div>
         </div>
       </aside>
@@ -517,15 +529,10 @@ export function TradingDesk() {
                     <Clock3 size={16} />
                   </div>
                   <div>
-                    <strong>
-                      {currentSession.open
-                        ? `${currentSession.label} is open`
-                        : currentSession.label}
-                    </strong>
+                    <strong>24/7 models are evaluated independently</strong>
                     <span>
-                      {currentSession.open
-                        ? "A session is only one gate. Wait for every setup condition."
-                        : "Markets are live. New research entries require a weekday NY window."}
+                      V3 separates setup triggers from context. V2.1 remains
+                      below as the weekday-only comparison baseline.
                     </span>
                   </div>
                   <button
@@ -546,6 +553,26 @@ export function TradingDesk() {
                   </button>
                 </div>
               )}
+              {view === "desk" && (
+                <ResearchDesk
+                  coin={coin}
+                  market={market}
+                  models={analysis?.research}
+                  context={feed.context}
+                  book={book}
+                  signalCandle={feed.signalCandle}
+                  now={now}
+                  dataReady={
+                    !scanStale &&
+                    !marketStale &&
+                    currentBar &&
+                    liveTriggerBar &&
+                    !feed.error
+                  }
+                  onRisk={openRisk}
+                />
+              )}
+              {view === "desk" && <JevContext key={coin} coin={coin} />}
               {view === "desk" && (
                 <div className="trading-grid">
                   <section className="panel price-panel">
@@ -655,7 +682,7 @@ export function TradingDesk() {
                   <aside className="panel setup-panel">
                     <div className="panel-heading">
                       <h2>
-                        <Crosshair size={16} /> Setup intelligence
+                        <Crosshair size={16} /> Baseline comparison
                       </h2>
                       <span className="version-tag">V2.1</span>
                     </div>
@@ -677,7 +704,7 @@ export function TradingDesk() {
                       <p>{setupSummary}</p>
                     </div>
                     <div className="gate-heading">
-                      <span>ENTRY CHECKLIST</span>
+                      <span>V2.1 RULE COMPLETENESS · NOT WIN ODDS</span>
                       <strong>
                         {gates.filter((g) => g.status === "pass").length}
                         <span> / {gates.length || 10}</span>
@@ -783,8 +810,10 @@ export function TradingDesk() {
                       <span>{rows.length}</span>
                     </h2>
                     <p>
-                      Ranked by execution quality and passed gates—not predicted
-                      returns.
+                      Ranked by fresh model candidates at scan, execution
+                      quality, then volume. Models are independent—not three
+                      checks that must all pass. Inspect the selected market for
+                      live validity.
                     </p>
                   </div>
                   <div className="scanner-search">
@@ -850,7 +879,7 @@ export function TradingDesk() {
                         <th className="optional-column">24h volume</th>
                         <th className="optional-column">Funding / hr</th>
                         <th>4h structure</th>
-                        <th>Setup status</th>
+                        <th>24/7 model observations</th>
                         <th className="optional-column">Net RR</th>
                         <th>
                           <span className="sr-only">Select</span>
@@ -861,6 +890,12 @@ export function TradingDesk() {
                       {rows.map(({ analysis: a, market: m }) => {
                         if (!m) return null;
                         const selected = a.coin === coin;
+                        const candidate = a.research?.find(
+                          (r) =>
+                            r.status === "candidate" &&
+                            r.plan &&
+                            now < r.plan.expiresAt,
+                        );
                         return (
                           <tr
                             key={a.coin}
@@ -925,28 +960,38 @@ export function TradingDesk() {
                                 <span className="status-dot" />
                                 {scanStale
                                   ? "Scan stale"
-                                  : a.liquid
-                                    ? a.stage
-                                    : "Liquidity filtered"}
+                                  : candidate
+                                    ? `${candidate.direction.toUpperCase()} · ${candidate.label}`
+                                    : a.liquid
+                                      ? "No fresh candidate"
+                                      : "Liquidity filtered"}
                               </span>
-                              <div
-                                className="progress-dots"
-                                aria-label={`${a.score} of ${a.gates.length} gates passed at scan`}
-                              >
-                                {Array.from({ length: 10 }, (_, i) => (
-                                  <i
-                                    key={i}
-                                    className={i < a.score ? "filled" : ""}
-                                  />
+                              <div className="model-radar-status">
+                                {(a.research ?? []).map((r) => (
+                                  <span
+                                    key={r.id}
+                                    title={`${r.label}: ${r.status}. ${r.summary}`}
+                                  >
+                                    {r.id === "continuation"
+                                      ? "Trend"
+                                      : r.id === "reversal"
+                                        ? "Sweep"
+                                        : "Break"}
+                                    :{" "}
+                                    {scanStale
+                                      ? "stale"
+                                      : r.plan &&
+                                          now >= r.plan.expiresAt &&
+                                          r.status === "candidate"
+                                        ? "expired"
+                                        : r.status}
+                                  </span>
                                 ))}
                               </div>
                             </td>
                             <td className="optional-column mono">
-                              {a.plan &&
-                              now < a.plan.expiresAt &&
-                              currentSession.open &&
-                              !scanStale
-                                ? `${a.plan.netRR.toFixed(2)}R*`
+                              {candidate?.plan && !scanStale
+                                ? `${candidate.plan.netRR.toFixed(2)}R*`
                                 : "—"}
                             </td>
                             <td>
@@ -1002,7 +1047,7 @@ export function TradingDesk() {
                       : "Connecting to public venue data"}
                   </span>
                   <span>
-                    Gate progress ≠ win probability · * snapshot estimate
+                    Model status ≠ win probability · * at-scan estimate
                   </span>
                 </div>
               </section>
