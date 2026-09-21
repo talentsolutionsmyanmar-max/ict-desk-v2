@@ -16,6 +16,62 @@ export const ADAPTIVE_MODELS = [
   { id: "reversal", label: "Failed-breakout scalp" },
 ] as const;
 
+function zoneWatchPlan(
+  model: (typeof ADAPTIVE_MODELS)[number]["id"],
+  direction: "long" | "short",
+  level: number,
+  atr: number,
+  market: Market,
+  now: number,
+): Plan | null {
+  if (![level, atr].every(Number.isFinite) || level <= 0 || atr <= 0) return null;
+  const long = direction === "long";
+  const tick = tickSize(level, market.szDecimals);
+  const entry = roundTick(level, tick, long ? "up" : "down");
+  const buffer = Math.max(2 * tick, 0.2 * atr);
+  const stop = roundTick(
+    long ? level - buffer : level + buffer,
+    tickSize(level + buffer, market.szDecimals),
+    long ? "down" : "up",
+  );
+  const risk = Math.abs(entry - stop);
+  if (!Number.isFinite(risk) || risk <= 0) return null;
+  const target = roundTick(
+    long ? entry + 2.5 * risk : entry - 2.5 * risk,
+    tickSize(entry + 2.5 * risk, market.szDecimals),
+    long ? "down" : "up",
+  );
+  const costs = {
+    entryFeeBps: 1.5,
+    exitFeeBps: 4.5,
+    slippageBps: 2,
+    fundingBps: 0,
+  };
+  const math = tradeMath(entry, stop, target, direction, costs);
+  if (!math.valid) return null;
+  return {
+    id: `${ADAPTIVE_VERSION}:${market.coin}:${model}:zone:${now}`,
+    direction,
+    entry,
+    stop,
+    target,
+    gapLow: Math.min(entry, level),
+    gapHigh: Math.max(entry, level),
+    formedAt: now,
+    expiresAt: now + 30 * 60_000,
+    sweepLevel: level,
+    sweepExtreme: level,
+    triggerLevel: level,
+    obstacle: target,
+    rangeLow: Math.min(stop, target),
+    rangeHigh: Math.max(stop, target),
+    netRR: math.netRR,
+    grossRR: math.grossRR,
+    costs,
+    maxHoldMs: model === "reversal" ? 30 * 60_000 : 120 * 60_000,
+  };
+}
+
 function impulse(c: Candle, atr: number, long: boolean) {
   return (
     c.high > c.low &&
@@ -276,6 +332,18 @@ export function analyzeAdaptive(
             : !plan || plan.netRR < RULES.minNetRR
               ? "filtered"
               : "candidate";
+    const watchDirection =
+      id === "continuation" && intraday !== "neutral"
+        ? intraday
+        : id === "reversal" && nearby
+          ? nearby.kind === "low"
+            ? "long"
+            : "short"
+          : "neutral";
+    const watchPlan =
+      status === "approaching" && watchDirection !== "neutral" && nearby && atr
+        ? zoneWatchPlan(id, watchDirection, nearby.price, atr, market, now)
+        : null;
     const summary =
       status === "blocked"
         ? quality
@@ -299,6 +367,7 @@ export function analyzeAdaptive(
       direction: selected?.event.direction ?? "neutral",
       status,
       plan,
+      watchPlan,
       regime,
       watchLevel: !selected && nearby ? nearby.price : undefined,
       summary,

@@ -131,6 +131,8 @@ export interface ResearchModel {
   context: string;
   gates: Gate[];
   plan: Plan | null;
+  /** A provisional zone plan shown before the closed-bar trigger confirms. */
+  watchPlan?: Plan | null;
 }
 export interface Session {
   open: boolean;

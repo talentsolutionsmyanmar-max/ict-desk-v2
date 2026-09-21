@@ -52,6 +52,8 @@ export function ResearchDesk({
   onRisk: (plan: Plan) => void;
 }) {
   const [touched, setTouched] = useState<string[]>([]);
+  const [alertsEnabled, setAlertsEnabled] = useState(false);
+  const [alertState, setAlertState] = useState<Record<string, string>>({});
   const observed = (models ?? [])
     .filter(
       (m) =>
@@ -78,6 +80,32 @@ export function ResearchDesk({
     book.spreadBps <= RULES.maxSpreadBps &&
     Math.min(book.bidDepth10bps, book.askDepth10bps) >= RULES.minDepth;
   const liveQuality = liveData && liveExecution;
+  const enableAlerts = async () => {
+    if (!("Notification" in window)) return;
+    const permission = await Notification.requestPermission();
+    setAlertsEnabled(permission === "granted");
+  };
+  useEffect(() => {
+    if (!("Notification" in window)) return;
+    setAlertsEnabled(Notification.permission === "granted");
+  }, []);
+  useEffect(() => {
+    if (!alertsEnabled || !models?.length) return;
+    for (const model of models) {
+      const state = model.status === "candidate" || model.status === "approaching"
+        ? model.status
+        : null;
+      if (!state || alertState[model.id] === state) continue;
+      const plan = model.plan ?? model.watchPlan;
+      if (plan) {
+        new Notification(`${coin} ${model.label}: ${state === "candidate" ? "entry ready" : "zone armed"}`, {
+          body: `${plan.direction.toUpperCase()} · entry ${price(plan.entry)} · SL ${price(plan.stop)} · TP ${price(plan.target)}`,
+          tag: `ict-desk-${coin}-${model.id}`,
+        });
+      }
+      setAlertState((previous) => ({ ...previous, [model.id]: state }));
+    }
+  }, [alertState, alertsEnabled, coin, models]);
   const depthTotal = book ? book.bidDepth10bps + book.askDepth10bps : 0;
   const bidShare =
     book?.coin === coin && quoteFresh(book, now) && depthTotal > 0
@@ -98,7 +126,13 @@ export function ResearchDesk({
             short-entry veto. No calibrated win probability or proven edge.
           </p>
         </div>
-        <span className="research-mode">No orders · no automatic alerts</span>
+        <span className="research-mode">No orders · browser alerts optional</span>
+      </div>
+      <div className="context-note">
+        <button className="button secondary-button" onClick={enableAlerts} disabled={alertsEnabled}>
+          {alertsEnabled ? "Browser alerts enabled" : "Enable browser setup alerts"}
+        </button>
+        <span>Alerts are local to this browser and require this tab to be open.</span>
       </div>
       <div className="context-grid" aria-label="Live positioning context">
         <div>
@@ -161,6 +195,7 @@ export function ResearchDesk({
         {models?.length ? (
           models.map((model) => {
             const plan = model.plan;
+            const displayPlan = plan ?? (model.status === "approaching" ? model.watchPlan : null);
             const lifecycle = plan
               ? researchLifecycle(
                   plan,
@@ -176,17 +211,17 @@ export function ResearchDesk({
                 : lifecycle === "expired"
                   ? "expired"
                   : model.status;
-            const sizing = plan
+            const sizing = displayPlan
               ? sizeScenario({
                   equity: account.equity,
                   riskPercent: account.riskPercent,
-                  entry: plan.entry,
+                  entry: displayPlan.entry,
                   math: tradeMath(
-                    plan.entry,
-                    plan.stop,
-                    plan.target,
-                    plan.direction,
-                    plan.costs,
+                    displayPlan.entry,
+                    displayPlan.stop,
+                    displayPlan.target,
+                    displayPlan.direction,
+                    displayPlan.costs,
                   ),
                   szDecimals: market?.szDecimals,
                 })
@@ -223,26 +258,25 @@ export function ResearchDesk({
                 <small>{model.context}</small>
                 {model.watchLevel !== undefined && (
                   <p className="model-explanation">
-                    Watch zone: {price(model.watchLevel)} · confirmation still
-                    required
+                    Watch zone: {price(model.watchLevel)} · armed levels are provisional; confirmation still required
                   </p>
                 )}
                 <dl className="model-prices">
                   <div>
                     <dt>Retest entry</dt>
-                    <dd>{plan ? price(plan.entry) : "—"}</dd>
+                    <dd>{displayPlan ? price(displayPlan.entry) : "—"}</dd>
                   </div>
                   <div>
                     <dt>Invalidation / SL</dt>
-                    <dd>{plan ? price(plan.stop) : "—"}</dd>
+                    <dd>{displayPlan ? price(displayPlan.stop) : "—"}</dd>
                   </div>
                   <div>
                     <dt>Structural TP</dt>
-                    <dd>{plan ? price(plan.target) : "—"}</dd>
+                    <dd>{displayPlan ? price(displayPlan.target) : "—"}</dd>
                   </div>
                   <div>
                     <dt>Estimated net RR</dt>
-                    <dd>{plan ? `${plan.netRR.toFixed(2)}R` : "—"}</dd>
+                    <dd>{displayPlan ? `${displayPlan.netRR.toFixed(2)}R` : "—"}</dd>
                   </div>
                 </dl>
                 <p className="model-explanation">
@@ -256,11 +290,9 @@ export function ResearchDesk({
                         ? "Retest window ended. Shown levels are a historical scenario."
                         : model.summary}
                 </p>
-                {plan && (
+                {displayPlan && (
                   <small>
-                    Confirmed {myanmarTime(plan.formedAt)} · expires{" "}
-                    {myanmarTime(plan.expiresAt)} MMT. Frozen scenario, not an
-                    order.
+                    {plan ? "Confirmed" : "Armed"} {myanmarTime(displayPlan.formedAt)} · expires {myanmarTime(displayPlan.expiresAt)} MMT. {plan ? "Frozen scenario, not an order." : "Provisional zone levels; wait for the trigger."}
                   </small>
                 )}
                 {sizing && (
@@ -295,10 +327,10 @@ export function ResearchDesk({
                     ))}
                   </ul>
                 </details>
-                {plan && (
+                {displayPlan && (
                   <button
                     className="button secondary-button"
-                    onClick={() => onRisk(plan)}
+                    onClick={() => onRisk(displayPlan)}
                   >
                     Inspect{" "}
                     {status === "candidate" && !sizeBlocked
