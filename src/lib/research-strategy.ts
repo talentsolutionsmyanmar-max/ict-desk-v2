@@ -47,6 +47,7 @@ export interface ResearchEvent {
 export function researchEvents(
   input: Omit<ResearchInput, "book">,
   now: number,
+  lookbackBars = 18,
 ): ResearchEvent[] {
   const five = closedCandles(input.five, now);
   const fifteen = closedCandles(input.fifteen, now);
@@ -58,7 +59,7 @@ export function researchEvents(
     Math.abs(c.close - c.open) >= 0.8 * atr &&
     Math.abs(c.close - c.open) / (c.high - c.low) >= 0.6 &&
     (long ? c.close > c.open : c.close < c.open);
-  for (let i = Math.max(22, five.length - 18); i < five.length; i++) {
+  for (let i = Math.max(22, five.length - lookbackBars); i < five.length; i++) {
     const c = five[i],
       atr = atrs[i - 1];
     if (!atr || atr <= 0) continue;
@@ -259,16 +260,44 @@ export function researchPlan(
   };
 }
 
+export function selectResearchObservation(
+  events: ResearchEvent[],
+  market: Market,
+  input: ResearchInput,
+  now: number,
+) {
+  const observations = events.map((event) => ({
+    event,
+    plan: researchPlan(event, market, input),
+  }));
+  return (
+    observations.find(
+      ({ plan }) =>
+        plan &&
+        plan.netRR >= RULES.minNetRR &&
+        researchLifecycle(plan, input.five, input.book, now) === "fresh",
+    ) ?? observations[0]
+  );
+}
+
 export function analyzeResearch(
   market: Market,
   input: ResearchInput,
   now: number,
 ): ResearchModel[] {
-  const dataOK =
-    completeSeries(input.five, INTERVAL_MS["5m"], now, 80) &&
-    completeSeries(input.fifteen, INTERVAL_MS["15m"], now, 100) &&
-    completeSeries(input.fourHour, INTERVAL_MS["4h"], now, 60) &&
-    quoteFresh(input.book, now);
+  const dataFailures = [
+    !completeSeries(input.five, INTERVAL_MS["5m"], now, 80) &&
+      "5m candles incomplete or stale",
+    !completeSeries(input.fifteen, INTERVAL_MS["15m"], now, 100) &&
+      "15m candles incomplete or stale",
+    !completeSeries(input.fourHour, INTERVAL_MS["4h"], now, 60) &&
+      "4h candles incomplete or stale",
+    !quoteFresh(input.book, now) &&
+      (input.book && input.book.time > now + 2000
+        ? "Venue quote is ahead of the desk clock; check clock synchronization"
+        : "Quote missing, stale or invalid"),
+  ].filter((reason): reason is string => !!reason);
+  const dataOK = dataFailures.length === 0;
   const b = input.book;
   const liquid =
     (market.volume24h ?? -1) >= RULES.minVolume &&
@@ -283,8 +312,15 @@ export function analyzeResearch(
   const events = dataOK ? researchEvents(input, now) : [];
   const trend: Direction = structure(closedCandles(input.fourHour, now), now);
   return RESEARCH_MODELS.map(({ id, label }) => {
-    const event = events.find((e) => e.model === id);
-    const plan = event ? researchPlan(event, market, input) : null;
+    // A newer rejected event must not hide an older still-actionable retest.
+    const selected = selectResearchObservation(
+      events.filter((e) => e.model === id),
+      market,
+      input,
+      now,
+    );
+    const event = selected?.event;
+    const plan = selected?.plan ?? null;
     const lifecycle = plan ? researchLifecycle(plan, input.five, b, now) : null;
     const netOK = !!plan && plan.netRR >= RULES.minNetRR;
     const gates: Gate[] = [
@@ -292,8 +328,9 @@ export function analyzeResearch(
         id: "data",
         label: "Current, complete data",
         status: dataOK ? "pass" : "fail",
-        detail:
-          "Closed, contiguous 4h/15m/5m bars and a quote no more than 5 seconds old.",
+        detail: dataOK
+          ? "Closed, contiguous 4h/15m/5m bars and a quote no more than 5 seconds old."
+          : dataFailures.join("; "),
       },
       {
         id: "liquidity",
@@ -352,7 +389,9 @@ export function analyzeResearch(
             : "Displacement through a confirmed 15m swing against, or without, a 4h trend; wait for its first retest.",
       summary:
         status === "blocked"
-          ? "Required market data or execution quality is unavailable."
+          ? dataOK
+            ? "Execution quality failed: inspect liquidity checks."
+            : dataFailures.join("; ")
           : status === "watching"
             ? "No recent closed-bar trigger for this model."
             : status === "passed"

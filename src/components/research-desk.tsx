@@ -241,7 +241,9 @@ export function ResearchDesk({
                 </dl>
                 <p className="model-explanation">
                   {status === "blocked"
-                    ? "Awaiting current market data and execution checks."
+                    ? model.status === "blocked"
+                      ? model.summary
+                      : "Awaiting current market data and execution checks."
                     : status === "passed"
                       ? "Retest already observed. Do not chase; no fill is assumed."
                       : status === "expired"

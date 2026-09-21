@@ -32,6 +32,7 @@ import { age, COIN_NAMES, compact, pct, price } from "@/lib/format";
 import { quoteFresh, RULES, sessionAt } from "@/lib/strategy";
 import { useDeskFeed } from "./use-desk-feed";
 import { ResearchDesk } from "./research-desk";
+import { OpportunityReview } from "./opportunity-review";
 import { JevContext } from "./jev-context";
 const MarketChart = dynamic(
   () => import("./market-chart").then((m) => m.MarketChart),
@@ -571,6 +572,9 @@ export function TradingDesk() {
                   }
                   onRisk={openRisk}
                 />
+              )}
+              {view === "desk" && (
+                <OpportunityReview key={`review:${coin}`} coin={coin} />
               )}
               {view === "desk" && <JevContext key={coin} coin={coin} />}
               {view === "desk" && (

@@ -4,7 +4,9 @@ import {
   analyzeResearch,
   researchEvents,
   researchLifecycle,
+  selectResearchObservation,
 } from "./research-strategy";
+import { replayResearch } from "./research-replay";
 import { analyze, sessionAt, structure } from "./strategy";
 import { Book, Candle, Market } from "./types";
 
@@ -240,4 +242,104 @@ test("entry, stop and target do not drift with subsequent quotes or current mark
     [first.id, first.entry, first.stop, first.target],
     [second.id, second.entry, second.stop, second.target],
   );
+});
+
+test("a newer low-RR trigger cannot mask an older untouched qualifying retest", () => {
+  const { market, input } = fixture();
+  const older = researchEvents(input, now).find((e) => e.model === "breakout")!;
+  const newer = { ...older, formedAt: older.formedAt + 1, extreme: 120 };
+  assert.equal(
+    selectResearchObservation([newer, older], market, input, now)?.event,
+    older,
+  );
+  input.five[360].high = 100;
+  assert.equal(
+    selectResearchObservation([newer, older], market, input, now)?.event,
+    newer,
+  );
+});
+
+test("replay reports low RR and retest together without claiming historical eligibility", () => {
+  const { market, input } = fixture();
+  input.fifteen[198].low = 96;
+  input.five[360].high = 100;
+  // Close the retest bar; no forming-bar information is used by replay.
+  const replay = replayResearch(market, input, boundary + 300000);
+  const event = replay.events.find((e) => e.model === "breakout")!;
+  assert.ok(event.reasons.includes("Net RR below 2R"));
+  assert.ok(event.reasons.includes("Retest observed; fill unverified"));
+  assert.ok(event.reasons.includes("Historical execution quality unavailable"));
+  assert.equal(replay.complete, false);
+  assert.equal(replay.expectedBars, 576);
+});
+
+test("48h replay retains triggers beyond the live 90-minute lookback", () => {
+  const { market, input } = fixture();
+  const later = boundary + 2 * 3600000;
+  for (const [key, step] of [
+    ["five", 300000],
+    ["fifteen", 900000],
+    ["fourHour", 14400000],
+  ] as const) {
+    const series = input[key];
+    for (let t = series.at(-1)!.closeTime + 1; t < later; t += step)
+      series.push({
+        time: t,
+        closeTime: t + step - 1,
+        open: 99,
+        high: 99.1,
+        low: 98.5,
+        close: 99,
+        volume: 100,
+      });
+  }
+  assert.equal(
+    researchEvents(input, later).some((e) => e.formedAt === boundary),
+    false,
+  );
+  const result = replayResearch(market, input, later);
+  const event = result.events.find((e) => e.formedAt === boundary)!;
+  assert.ok(event);
+  assert.equal(event.lifecycle, "expired");
+  const before = replayResearch(market, input, boundary);
+  input.five.push({
+    ...input.five.at(-1)!,
+    time: later,
+    closeTime: later + 299999,
+    high: 300,
+    low: 1,
+  });
+  assert.deepEqual(replayResearch(market, input, boundary), before);
+});
+
+test("replay does not use current funding or book as historical evidence", () => {
+  const { market, input } = fixture();
+  const before = replayResearch(market, input, now);
+  market.fundingHourly = 0.02;
+  input.book.ask = 200;
+  input.book.askDepth10bps = 0;
+  assert.deepEqual(replayResearch(market, input, now), before);
+});
+
+test("replay verifies full 48-hour coverage and flags a missing historical bar", () => {
+  const { market } = fixture();
+  const input = {
+    five: bars(700, 300000),
+    fifteen: bars(320, 900000),
+    fourHour: bars(140, 14400000),
+    book: null,
+  };
+  assert.equal(replayResearch(market, input, now).complete, true);
+  input.five.splice(500, 1);
+  const partial = replayResearch(market, input, now);
+  assert.equal(partial.complete, false);
+  assert.ok(partial.evaluatedBars < 576);
+});
+
+test("clock skew is explained instead of silently appearing as no trigger", () => {
+  const { market, input } = fixture();
+  input.book.time = now + 3000;
+  const model = analyzeResearch(market, input, now)[0];
+  assert.equal(model.status, "blocked");
+  assert.match(model.summary, /clock synchronization/);
 });

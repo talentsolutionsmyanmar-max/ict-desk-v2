@@ -1,5 +1,6 @@
 import { analyze, blockedAnalysis, STRATEGY_VERSION } from "./strategy";
 import { analyzeResearch, RESEARCH_VERSION } from "./research-strategy";
+import { replayResearch } from "./research-replay";
 import {
   Book,
   Candle,
@@ -197,10 +198,21 @@ export async function getMarkets(): Promise<MarketSnapshot> {
 export async function getCandles(
   coin: string,
   interval: Interval,
-  purpose: "chart" | "scan" = "chart",
+  purpose: "chart" | "scan" | "replay" = "chart",
 ): Promise<Candle[]> {
   const step = INTERVAL_MS[interval];
-  const count = interval === "5m" ? 360 : interval === "15m" ? 220 : 140;
+  const count =
+    purpose === "replay"
+      ? interval === "5m"
+        ? 700
+        : interval === "15m"
+          ? 320
+          : 140
+      : interval === "5m"
+        ? 360
+        : interval === "15m"
+          ? 220
+          : 140;
   const boundary = Math.floor(Date.now() / step) * step;
   const ttl =
     interval === "5m"
@@ -210,7 +222,8 @@ export async function getCandles(
         : interval === "15m"
           ? 30_000
           : 60_000;
-  const cachePurpose = interval === "5m" ? "shared" : purpose;
+  const cachePurpose =
+    purpose === "replay" ? "replay" : interval === "5m" ? "shared" : purpose;
   return cached(
     `candles:${coin}:${interval}:${cachePurpose}:${boundary}`,
     ttl,
@@ -230,6 +243,24 @@ export async function getCandles(
 }
 async function getBook(coin: string) {
   return parseBook(await info({ type: "l2Book", coin }), coin, Date.now());
+}
+export async function getReplay(market: Market) {
+  return cached(
+    `replay:${market.coin}:${Math.floor(Date.now() / 300000)}`,
+    60_000,
+    async () => {
+      const [five, fifteen, fourHour] = await Promise.all([
+        getCandles(market.coin, "5m", "replay"),
+        getCandles(market.coin, "15m", "replay"),
+        getCandles(market.coin, "4h", "replay"),
+      ]);
+      return replayResearch(
+        market,
+        { five, fifteen, fourHour, book: null },
+        Date.now(),
+      );
+    },
+  );
 }
 export function scanUniverse(markets: Market[]): Market[] {
   const core = ["BTC", "ETH", "SOL"]

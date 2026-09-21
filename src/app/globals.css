@@ -3529,6 +3529,37 @@ h1 {
     height: 4px;
   }
 }
+.opportunity-review {
+  padding: 22px;
+  margin-bottom: 20px;
+  min-width: 0;
+}
+.opportunity-review > p {
+  margin: 12px 0;
+  line-height: 1.6;
+}
+.opportunity-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 290px), 1fr));
+  gap: 12px;
+  max-height: 620px;
+  overflow-y: auto;
+  margin-top: 18px;
+}
+.opportunity-event {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 16px;
+  min-width: 0;
+}
+.opportunity-event ul {
+  padding-left: 18px;
+  font-size: 12px;
+  line-height: 1.8;
+}
+.opportunity-review button {
+  flex-shrink: 0;
+}
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
