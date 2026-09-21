@@ -7,13 +7,10 @@ import { researchLifecycle } from "@/lib/research-strategy";
 import { quoteFresh, RULES } from "@/lib/strategy";
 import { price, pct, compact } from "@/lib/format";
 import { tradeMath } from "@/lib/math";
-import {
-  sizeScenario,
-  SMALL_ACCOUNT_EQUITY,
-  DEFAULT_RISK_PERCENT,
-} from "@/lib/sizing";
+import { sizeScenario, AccountSettings } from "@/lib/sizing";
 
 const label = {
+  approaching: "Zone watch · not an entry",
   watching: "Watching",
   candidate: "Research candidate",
   filtered: "Economics filtered",
@@ -32,6 +29,7 @@ const myanmarTime = (time: number) =>
   }).format(time);
 
 export function ResearchDesk({
+  account,
   coin,
   market,
   models,
@@ -42,6 +40,7 @@ export function ResearchDesk({
   dataReady,
   onRisk,
 }: {
+  account: AccountSettings;
   coin: string;
   market?: Market;
   models?: ResearchModel[];
@@ -88,10 +87,11 @@ export function ResearchDesk({
     <section className="panel research-desk" aria-labelledby="research-title">
       <div className="research-heading">
         <div>
-          <div className="eyebrow">V3 · SHADOW RESEARCH · {coin} PERPETUAL</div>
+          <div className="eyebrow">
+            V4 · FORWARD RESEARCH · {coin} PERPETUAL
+          </div>
           <h2 id="research-title">
-            <FlaskConical size={19} /> Three models. Different market
-            conditions.
+            <FlaskConical size={19} /> Two playbooks. Defined execution.
           </h2>
           <p>
             24/7 evaluation. Session and 4h bias are context—not a blanket
@@ -178,8 +178,8 @@ export function ResearchDesk({
                   : model.status;
             const sizing = plan
               ? sizeScenario({
-                  equity: SMALL_ACCOUNT_EQUITY,
-                  riskPercent: DEFAULT_RISK_PERCENT,
+                  equity: account.equity,
+                  riskPercent: account.riskPercent,
                   entry: plan.entry,
                   math: tradeMath(
                     plan.entry,
@@ -216,11 +216,17 @@ export function ResearchDesk({
                 </div>
                 <strong className="model-state">
                   {status === "candidate" && sizeBlocked
-                    ? "$100 size blocked"
+                    ? "Account size blocked"
                     : label[status]}
                 </strong>
                 <p>{model.trigger}</p>
                 <small>{model.context}</small>
+                {model.watchLevel !== undefined && (
+                  <p className="model-explanation">
+                    Watch zone: {price(model.watchLevel)} · confirmation still
+                    required
+                  </p>
+                )}
                 <dl className="model-prices">
                   <div>
                     <dt>Retest entry</dt>
@@ -259,7 +265,8 @@ export function ResearchDesk({
                 )}
                 {sizing && (
                   <p className="model-sizing">
-                    $100 reference / 0.25% planned risk:{" "}
+                    ${account.equity.toLocaleString()} reference /{" "}
+                    {account.riskPercent}% planned risk:{" "}
                     {sizeBlocked
                       ? sizing.reason
                       : `$${sizing.notional.toFixed(2)} notional · $${sizing.estimatedStopLoss.toFixed(2)} modeled loss. Actual loss can exceed this.`}
@@ -321,10 +328,10 @@ export function ResearchDesk({
           not a liquidation heatmap.
         </p>
         <p>
-          Liquidation heatmaps, attributed exchange inflow/outflow, durable
-          signal history and always-on alerts are not connected. Missing data is
-          not treated as neutral confirmation. No wallet or trading API is
-          connected.
+          Liquidation heatmaps, attributed exchange inflow/outflow and push
+          alerts are not connected. See the forward journal for recorder
+          connection and heartbeat status. Missing data is not treated as
+          neutral confirmation. No wallet or trading API is connected.
         </p>
         <a
           href="https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/websocket/subscriptions"

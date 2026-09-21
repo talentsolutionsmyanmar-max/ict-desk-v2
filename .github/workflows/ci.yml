@@ -1,7 +1,7 @@
 name: Verify trading desk
 on:
   push:
-    branches: [main, codex/edge-trading-desk]
+    branches: [main, codex/edge-trading-desk, feat/adaptive-research-desk]
   pull_request:
 permissions:
   contents: read

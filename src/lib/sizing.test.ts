@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { tradeMath } from "./math";
-import { sizeScenario } from "./sizing";
+import { sizeScenario, DEFAULT_ACCOUNT, validAccount } from "./sizing";
 import { DEFAULT_COSTS } from "./types";
 
 // Synthetic scenarios test arithmetic, not real signals or historical returns.
@@ -12,6 +12,19 @@ const scenario = {
   math: tradeMath(100, 99, 103, "long"),
   szDecimals: 4,
 };
+test("the $1,000 default budgets $2.50 and remains configurable without increasing percentage risk", () => {
+  assert.equal(DEFAULT_ACCOUNT.equity, 1000);
+  assert.equal(DEFAULT_ACCOUNT.riskPercent, 0.25);
+  const size = sizeScenario({ ...scenario, ...DEFAULT_ACCOUNT });
+  assert.ok(
+    size.meetsMinimum &&
+      size.estimatedStopLoss <= 2.5 &&
+      size.estimatedStopLoss > 2.49,
+  );
+  assert.ok(size.notional + size.estimatedStopCosts <= 1000);
+  assert.equal(validAccount({ equity: NaN, riskPercent: 0.25 }), false);
+  assert.equal(validAccount({ equity: 1000, riskPercent: 2 }), false);
+});
 
 test("a $100 account at 0.25% budgets at most $0.25 including estimated costs", () => {
   const size = sizeScenario(scenario);

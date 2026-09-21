@@ -8,21 +8,20 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { tradeMath } from "@/lib/math";
-import {
-  DEFAULT_RISK_PERCENT,
-  MIN_PERP_NOTIONAL,
-  SMALL_ACCOUNT_EQUITY,
-  sizeScenario,
-} from "@/lib/sizing";
+import { MIN_PERP_NOTIONAL, AccountSettings, sizeScenario } from "@/lib/sizing";
 import { Market, Plan } from "@/lib/types";
 import { money } from "@/lib/format";
 
 const readNumber = (value: string) => (value.trim() ? Number(value) : NaN);
 
 export function RiskLab({
+  account,
+  onAccountChange,
   market,
   plan,
 }: {
+  account: AccountSettings;
+  onAccountChange: (value: AccountSettings) => void;
   market: Market | undefined;
   plan: Plan | null;
 }) {
@@ -31,14 +30,12 @@ export function RiskLab({
     plan?.direction ?? "long",
   );
   const [values, setValues] = useState({
-    equity: String(SMALL_ACCOUNT_EQUITY),
-    risk: String(DEFAULT_RISK_PERCENT),
     entry: initial ? String(initial) : "",
     stop: plan ? String(plan.stop) : "",
     target: plan ? String(plan.target) : "",
-    entryFee: "1.5",
-    exitFee: "4.5",
-    slippage: "2",
+    entryFee: String(plan?.costs.entryFeeBps ?? 1.5),
+    exitFee: String(plan?.costs.exitFeeBps ?? 4.5),
+    slippage: String(plan?.costs.slippageBps ?? 2),
     funding: String(plan?.costs.fundingBps ?? 0),
   });
   const field = (key: keyof typeof values, label: string, hint?: string) => (
@@ -71,8 +68,8 @@ export function RiskLab({
     direction,
     costs,
   );
-  const equity = readNumber(values.equity);
-  const riskPercent = readNumber(values.risk);
+  const equity = account.equity;
+  const riskPercent = account.riskPercent;
   const settingsValid =
     Number.isFinite(equity) &&
     equity > 0 &&
@@ -134,8 +131,8 @@ export function RiskLab({
           </div>
           <div className="risk-form">
             <p className="field-note account-context">
-              Small-account default: $100 equity, 0.25% planned risk ($0.25).
-              Hypothetical sizing only—no account balance or available margin is
+              Uses the same account settings as the market desk. Default: $1,000
+              equity and 0.25% planned risk ($2.50). No wallet balance is
               connected.
             </p>
             <div className="segmented">
@@ -155,8 +152,39 @@ export function RiskLab({
               </button>
             </div>
             <div className="form-grid">
-              {field("equity", "Reference equity", "USD")}
-              {field("risk", "Planned risk", "% · max 1")}
+              <label className="form-field">
+                <span>Reference equity · USD</span>
+                <input
+                  aria-label="Risk lab equity"
+                  type="number"
+                  min="1"
+                  step="any"
+                  value={Number.isFinite(equity) ? equity : ""}
+                  onChange={(e) =>
+                    onAccountChange({
+                      ...account,
+                      equity: readNumber(e.target.value),
+                    })
+                  }
+                />
+              </label>
+              <label className="form-field">
+                <span>Planned risk · % · max 1</span>
+                <input
+                  aria-label="Risk lab risk percent"
+                  type="number"
+                  min="0.01"
+                  max="1"
+                  step="0.05"
+                  value={Number.isFinite(riskPercent) ? riskPercent : ""}
+                  onChange={(e) =>
+                    onAccountChange({
+                      ...account,
+                      riskPercent: readNumber(e.target.value),
+                    })
+                  }
+                />
+              </label>
               {field("entry", "Entry price", "USD")}
               {field("stop", "Initial stop", "USD")}
               {field("target", "Target price", "USD")}
@@ -165,8 +193,9 @@ export function RiskLab({
               <p className="field-note">
                 Imported levels are a fixed snapshot, not a live order. Recheck
                 the originating model’s conditions, live freshness and account
-                risk on the market desk before use. V3 models are independent;
-                the ten-gate checklist belongs only to the V2.1 baseline.
+                risk on the market desk before use. V4 playbooks are
+                independent; the ten-gate checklist belongs only to the V2.1
+                baseline.
               </p>
             )}
             <button className="text-button" onClick={example}>

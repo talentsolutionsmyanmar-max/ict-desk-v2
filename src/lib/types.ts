@@ -75,6 +75,7 @@ export interface TradeMath {
   breakEven: number;
 }
 export interface Plan {
+  maxHoldMs?: number;
   id: string;
   direction: "long" | "short";
   entry: number;
@@ -116,7 +117,15 @@ export interface ResearchModel {
   label: string;
   direction: Direction;
   status:
-    "watching" | "candidate" | "filtered" | "passed" | "expired" | "blocked";
+    | "watching"
+    | "approaching"
+    | "candidate"
+    | "filtered"
+    | "passed"
+    | "expired"
+    | "blocked";
+  watchLevel?: number;
+  regime?: string;
   summary: string;
   trigger: string;
   context: string;

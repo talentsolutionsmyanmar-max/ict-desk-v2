@@ -3560,6 +3560,21 @@ h1 {
 .opportunity-review button {
   flex-shrink: 0;
 }
+.account-controls { display: grid; grid-template-columns: 1.3fr 1fr 1fr 1fr; align-items: center; gap: 20px; padding: 24px; margin-bottom: 20px; }
+.account-controls h2 { margin: 8px 0; font-size: 20px; }
+.account-controls p { color: var(--secondary); font-size: 12px; line-height: 1.6; }
+.account-controls strong { color: var(--accent); font-size: 25px; }
+.account-controls .form-field { min-width: 0; }
+.forward-journal { padding: 22px; margin-bottom: 20px; min-width: 0; }
+.forward-journal > p, .forward-journal > details { margin: 16px 0; line-height: 1.7; font-size: 12px; }
+.forward-journal .context-grid { margin: 16px 0; }
+.forward-journal select { background: var(--panel-deep); color: var(--text); padding: 10px; border: 1px solid var(--line); border-radius: 6px; }
+.forward-journal details ul { padding-left: 20px; }
+.forward-transitions { max-height: 320px; overflow-y: auto; }
+.forward-transitions li { margin: 12px 0; }
+.research-models { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 900px) { .account-controls { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 600px) { .account-controls, .research-models { grid-template-columns: 1fr; } .forward-journal { padding: 14px; } }
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;

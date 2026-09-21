@@ -34,6 +34,9 @@ import { useDeskFeed } from "./use-desk-feed";
 import { ResearchDesk } from "./research-desk";
 import { OpportunityReview } from "./opportunity-review";
 import { JevContext } from "./jev-context";
+import { AccountControls } from "./account-settings";
+import { ForwardJournal } from "./forward-journal";
+import { AccountSettings, DEFAULT_ACCOUNT, validAccount } from "@/lib/sizing";
 const MarketChart = dynamic(
   () => import("./market-chart").then((m) => m.MarketChart),
   {
@@ -96,9 +99,10 @@ function DirectionBadge({ direction }: { direction: Analysis["direction"] }) {
 }
 
 export function TradingDesk() {
+  const [account, setAccount] = useState<AccountSettings>(DEFAULT_ACCOUNT);
   const [view, setView] = useState<View>("desk");
   const [coin, setCoin] = useState("BTC");
-  const [interval, setInterval] = useState<Interval>("15m");
+  const [interval, setInterval] = useState<Interval>("5m");
   const [watchlist, setWatchlist] = useState<string[]>(["BTC", "ETH", "SOL"]);
   const [storageWarning, setStorageWarning] = useState("");
   const [search, setSearch] = useState("");
@@ -112,6 +116,11 @@ export function TradingDesk() {
   const { now, markets, scan } = feed;
   useEffect(() => {
     try {
+      const storedAccount = JSON.parse(
+        localStorage.getItem("ict-edge-account-v1") ?? "null",
+      );
+      if (storedAccount && validAccount(storedAccount))
+        setAccount(storedAccount);
       const saved = JSON.parse(
         localStorage.getItem("ict-edge-watchlist-v1") ?? "null",
       );
@@ -139,6 +148,18 @@ export function TradingDesk() {
     window.addEventListener("keydown", keyboard);
     return () => window.removeEventListener("keydown", keyboard);
   }, []);
+  const updateAccount = (value: AccountSettings) => {
+    setAccount(value);
+    if (validAccount(value)) {
+      try {
+        localStorage.setItem("ict-edge-account-v1", JSON.stringify(value));
+      } catch {
+        setStorageWarning(
+          "Account settings could not be saved on this device.",
+        );
+      }
+    }
+  };
   const toggleWatch = (symbol: string) => {
     const next = watchlist.includes(symbol)
       ? watchlist.filter((s) => s !== symbol)
@@ -364,7 +385,7 @@ export function TradingDesk() {
             <GitBranch size={15} /> View source <ExternalLink size={12} />
           </a>
           <div className="sidebar-version">
-            <span className="status-dot" /> V3 shadow<span>V2.1 BASELINE</span>
+            <span className="status-dot" /> V4 forward<span>V2.1 BASELINE</span>
           </div>
         </div>
       </aside>
@@ -532,8 +553,9 @@ export function TradingDesk() {
                   <div>
                     <strong>24/7 models are evaluated independently</strong>
                     <span>
-                      V3 separates setup triggers from context. V2.1 remains
-                      below as the weekday-only comparison baseline.
+                      V4 uses two execution playbooks with 15M regime context.
+                      V2.1 remains below as the weekday-only comparison
+                      baseline.
                     </span>
                   </div>
                   <button
@@ -555,7 +577,11 @@ export function TradingDesk() {
                 </div>
               )}
               {view === "desk" && (
+                <AccountControls account={account} onChange={updateAccount} />
+              )}
+              {view === "desk" && (
                 <ResearchDesk
+                  account={account}
                   coin={coin}
                   market={market}
                   models={analysis?.research}
@@ -576,6 +602,7 @@ export function TradingDesk() {
               {view === "desk" && (
                 <OpportunityReview key={`review:${coin}`} coin={coin} />
               )}
+              {view === "desk" && <ForwardJournal />}
               {view === "desk" && <JevContext key={coin} coin={coin} />}
               {view === "desk" && (
                 <div className="trading-grid">
@@ -815,9 +842,9 @@ export function TradingDesk() {
                     </h2>
                     <p>
                       Ranked by fresh model candidates at scan, execution
-                      quality, then volume. Models are independent—not three
-                      checks that must all pass. Inspect the selected market for
-                      live validity.
+                      quality, then volume. Playbooks are independent, not
+                      combined checks that must all pass. Inspect the selected
+                      market for live validity.
                     </p>
                   </div>
                   <div className="scanner-search">
@@ -1076,6 +1103,8 @@ export function TradingDesk() {
           )}
           {view === "risk" && (
             <RiskLab
+              account={account}
+              onAccountChange={updateAccount}
               key={`${coin}:${riskPlan?.id ?? "manual"}`}
               market={market}
               plan={riskPlan}

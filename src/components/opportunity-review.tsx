@@ -4,8 +4,8 @@ import type { ResearchReplay } from "@/lib/research-replay";
 import { price } from "@/lib/format";
 
 const names = {
-  continuation: "Trend continuation",
-  reversal: "Sweep reversal",
+  continuation: "Intraday pullback",
+  reversal: "Failed-breakout scalp",
   breakout: "Break & retest",
 };
 const time = (value: number) =>
@@ -81,7 +81,8 @@ export function OpportunityReview({ coin }: { coin: string }) {
         <>
           <p role="status">
             <strong>{result.events.length} model triggers</strong> ·{" "}
-            {result.evaluatedBars}/{result.expectedBars} bars evaluated ·{" "}
+            {result.version} · {result.evaluatedBars}/{result.expectedBars} bars
+            evaluated ·{" "}
             {result.complete
               ? "Full candle coverage"
               : "Partial coverage — missing bars or warm-up"}
@@ -95,7 +96,7 @@ export function OpportunityReview({ coin }: { coin: string }) {
           {result.events.length === 0 ? (
             <p>
               {result.complete
-                ? "No confirmed trigger under these three models in this window."
+                ? "No confirmed trigger under these two playbooks in this window."
                 : "No triggers in the evaluable bars. Incomplete coverage prevents a conclusion for the full 48 hours."}
             </p>
           ) : (

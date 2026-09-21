@@ -1,5 +1,5 @@
 import { analyze, blockedAnalysis, STRATEGY_VERSION } from "./strategy";
-import { analyzeResearch, RESEARCH_VERSION } from "./research-strategy";
+import { analyzeAdaptive, ADAPTIVE_VERSION } from "./adaptive-strategy";
 import { replayResearch } from "./research-replay";
 import {
   Book,
@@ -258,6 +258,7 @@ export async function getReplay(market: Market) {
         market,
         { five, fifteen, fourHour, book: null },
         Date.now(),
+        true,
       );
     },
   );
@@ -301,7 +302,7 @@ export async function getScan(): Promise<ScanSnapshot> {
                 { five, fifteen, fourHour, book },
                 Date.now(),
               );
-              analyses[i].research = analyzeResearch(
+              analyses[i].research = analyzeAdaptive(
                 m,
                 { five, fifteen, fourHour, book },
                 analyses[i].evaluatedAt,
@@ -316,6 +317,8 @@ export async function getScan(): Promise<ScanSnapshot> {
       return {
         analyses: analyses.sort(
           (a, b) =>
+            Number(b.research?.some((m) => m.status === "candidate")) -
+              Number(a.research?.some((m) => m.status === "candidate")) ||
             Number(b.ready) - Number(a.ready) ||
             Number(b.liquid) - Number(a.liquid) ||
             b.score - a.score,
@@ -324,7 +327,7 @@ export async function getScan(): Promise<ScanSnapshot> {
         universeCount: snapshot.markets.length,
         analyzedCount: universe.length,
         strategyVersion: STRATEGY_VERSION,
-        researchVersion: RESEARCH_VERSION,
+        researchVersion: ADAPTIVE_VERSION,
         errors,
       };
     },

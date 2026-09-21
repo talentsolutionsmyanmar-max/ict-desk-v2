@@ -4,8 +4,25 @@ import { TradeMath } from "./types";
 // Native Hyperliquid perpetuals only; not a portable rule for other venues.
 // https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/error-responses
 export const MIN_PERP_NOTIONAL = 10;
-export const SMALL_ACCOUNT_EQUITY = 100;
+export const DEFAULT_ACCOUNT_EQUITY = 1000;
 export const DEFAULT_RISK_PERCENT = 0.25;
+export interface AccountSettings {
+  equity: number;
+  riskPercent: number;
+}
+export const DEFAULT_ACCOUNT: AccountSettings = {
+  equity: DEFAULT_ACCOUNT_EQUITY,
+  riskPercent: DEFAULT_RISK_PERCENT,
+};
+export function validAccount(value: AccountSettings) {
+  return (
+    Number.isFinite(value.equity) &&
+    value.equity > 0 &&
+    Number.isFinite(value.riskPercent) &&
+    value.riskPercent > 0 &&
+    value.riskPercent <= 1
+  );
+}
 
 export function sizeScenario({
   equity,

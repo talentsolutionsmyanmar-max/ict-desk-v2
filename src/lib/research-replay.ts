@@ -6,6 +6,11 @@ import {
 } from "./research-strategy";
 import { closedCandles, completeSeries, RULES } from "./strategy";
 import { INTERVAL_MS, Market, Plan, ResearchModelId } from "./types";
+import {
+  adaptiveEvents,
+  adaptivePlan,
+  ADAPTIVE_VERSION,
+} from "./adaptive-strategy";
 
 export interface ReplayEvent {
   id: string;
@@ -17,6 +22,7 @@ export interface ReplayEvent {
   lifecycle: "fresh" | "passed" | "expired" | null;
 }
 export interface ResearchReplay {
+  version?: string;
   coin: string;
   from: number;
   to: number;
@@ -32,6 +38,7 @@ export function replayResearch(
   market: Market,
   input: ResearchInput,
   now: number,
+  adaptive = false,
 ): ResearchReplay {
   const step = INTERVAL_MS["5m"];
   const to = Math.floor(now / step) * step;
@@ -51,7 +58,9 @@ export function replayResearch(
       )
       .map((c) => c.closeTime + 1),
   );
-  const events = researchEvents(input, to, 582)
+  const events = (
+    adaptive ? adaptiveEvents(input, to, 582) : researchEvents(input, to, 582)
+  )
     .filter(
       (event) =>
         event.formedAt > from &&
@@ -59,7 +68,11 @@ export function replayResearch(
         evaluated.has(event.formedAt),
     )
     .map((event): ReplayEvent => {
-      const plan = researchPlan(event, { ...market, fundingHourly: 0 }, input);
+      const plan = (adaptive ? adaptivePlan : researchPlan)(
+        event,
+        { ...market, fundingHourly: 0 },
+        input,
+      );
       const lifecycle = plan ? researchLifecycle(plan, five, null, to) : null;
       const reasons: string[] = [];
       if (!plan) reasons.push("No valid structural target / stop");
@@ -81,6 +94,7 @@ export function replayResearch(
       };
     });
   return {
+    version: adaptive ? ADAPTIVE_VERSION : "3.0-shadow",
     coin: market.coin,
     from,
     to,

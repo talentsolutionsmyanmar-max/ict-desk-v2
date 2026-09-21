@@ -57,7 +57,7 @@ export function Playbook() {
           </p>
         </div>
         <span className="pill muted">
-          <GitBranch size={13} /> v3 shadow + v2.1 baseline
+          <GitBranch size={13} /> v4 forward + v2.1 baseline
         </span>
       </div>
       <div className="playbook-intro panel">
@@ -83,24 +83,32 @@ export function Playbook() {
       </div>
       <div className="playbook-intro panel">
         <div>
-          <span className="eyebrow">V3 · THREE INDEPENDENT MODELS · 24/7</span>
+          <span className="eyebrow">V4 · TWO EXECUTION PLAYBOOKS · 24/7</span>
           <h2>Context is not a universal veto.</h2>
         </div>
         <div>
           <p>
-            Trend continuation trades a confirmed 15m swing break in the 4h
-            direction. Break &amp; retest evaluates a break against, or without,
-            that trend. Sweep reversal requires a reclaimed 15m swing followed
-            by a break of the pre-sweep 5m swing. No FVG or New York window is
-            required for V3.
+            Intraday pullback follows the confirmed 15M trend: a displaced swing
+            break, a pullback that holds the level, then a fresh closed 5M
+            continuation and first retest. Its stop sits beyond the pullback,
+            not an unrelated distant swing. 4H direction is context; untouched
+            4H levels constrain the target.
           </p>
           <p>
-            All use closed-bar displacement, a first retest at the broken swing,
-            a buffered structural stop and a 30-minute expiry. Target room is
-            frozen at confirmation, capped at 4R gross, and must provide at
-            least 2R estimated net. OI change, signed trade flow, funding and
-            depth are separately labeled context, not a confidence score. These
-            hypotheses have no validated expectancy.
+            Failed-breakout scalp requires a swept and reclaimed 15M swing, a
+            closed 5M reversal break and first retest. The stop is beyond the
+            sweep; the target is capped at a pre-existing range midpoint and
+            nearer obstructions. Entry expires after 15 minutes for scalps or 30
+            minutes for continuation. Paper holding limits are 30 and 120
+            minutes respectively. Both retain the 2R net floor pending evidence
+            for any change.
+          </p>
+          <p>
+            Forward recording freezes signals and execution checks before paper
+            entry. Results deduct modeled fees, slippage and funding, with
+            missing data and ambiguous fills exposed. OI and flow remain
+            supporting context. These hypotheses do not yet have validated
+            expectancy.
           </p>
         </div>
       </div>
