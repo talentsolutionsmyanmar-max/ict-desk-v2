@@ -912,6 +912,7 @@ export function TradingDesk() {
                         <th>4h structure</th>
                         <th>24/7 model observations</th>
                         <th className="optional-column">Net RR</th>
+                        <th className="optional-column">Entry · SL · TP</th>
                         <th>
                           <span className="sr-only">Select</span>
                         </th>
@@ -927,6 +928,13 @@ export function TradingDesk() {
                             r.plan &&
                             now < r.plan.expiresAt,
                         );
+                        const setupModel = a.research?.find(
+                          (r) =>
+                            ((r.status === "candidate" && r.plan) ||
+                              (r.status === "approaching" && r.watchPlan)) &&
+                            (r.plan ? now < r.plan.expiresAt : true),
+                        );
+                        const setupPlan = setupModel?.plan ?? setupModel?.watchPlan;
                         return (
                           <tr
                             key={a.coin}
@@ -1023,7 +1031,19 @@ export function TradingDesk() {
                             <td className="optional-column mono">
                               {candidate?.plan && !scanStale
                                 ? `${candidate.plan.netRR.toFixed(2)}R*`
-                                : "—"}
+                                : setupPlan && !scanStale
+                                  ? `${setupPlan.netRR.toFixed(2)}R†`
+                                  : "—"}
+                            </td>
+                            <td className="optional-column mono radar-levels">
+                              {setupPlan && !scanStale ? (
+                                <span title={`${setupModel?.label}: ${setupModel?.status}`}>
+                                  <b>{price(setupPlan.entry)}</b> · {price(setupPlan.stop)} · {price(setupPlan.target)}
+                                  <small>{setupModel?.status === "approaching" ? "ARMED" : "READY"}</small>
+                                </span>
+                              ) : (
+                                "—"
+                              )}
                             </td>
                             <td>
                               <button

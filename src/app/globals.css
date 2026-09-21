@@ -1543,6 +1543,17 @@ h1 {
   margin: 9px 17px 0;
   line-height: 1.5;
 }
+
+.radar-levels {
+  white-space: nowrap;
+}
+
+.radar-levels small {
+  display: block;
+  color: var(--muted);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+}
 .scanner-panel {
   margin-bottom: 20px;
 }
