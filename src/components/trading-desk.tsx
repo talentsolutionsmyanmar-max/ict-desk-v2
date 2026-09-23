@@ -30,7 +30,9 @@ import {
 import { Analysis, Gate, INTERVAL_MS, Interval, Plan } from "@/lib/types";
 import { age, COIN_NAMES, compact, pct, price } from "@/lib/format";
 import { quoteFresh, RULES, sessionAt } from "@/lib/strategy";
+import { buildTradePlanView } from "@/lib/trade-plan";
 import { useDeskFeed } from "./use-desk-feed";
+import { TradePlanCard } from "./trade-plan-card";
 const MarketChart = dynamic(
   () => import("./market-chart").then((m) => m.MarketChart),
   {
@@ -244,6 +246,29 @@ export function TradingDesk() {
           ? "Waiting for complete closed-bar context and a fresh executable quote. Live price alone cannot confirm a setup."
           : (analysis?.summary ??
             "Loading confirmed structure, liquidity and cost-aware setup conditions.");
+  const tradePlan = buildTradePlanView({
+    analysis: analysis
+      ? {
+          ...analysis,
+          stage,
+          summary: setupSummary,
+          session: currentSession,
+        }
+      : analysis,
+    gates,
+    plan,
+    freshness: liveRetest
+      ? "touched"
+      : planExpired
+        ? !currentSession.open
+          ? "session-closed"
+          : "expired"
+        : plan
+          ? "fresh"
+          : "none",
+    szDecimals: market?.szDecimals,
+    now,
+  });
   const rows = useMemo(() => {
     const matched = (scan?.analyses ?? [])
       .map((a) => ({
@@ -732,43 +757,14 @@ export function TradingDesk() {
                         </div>
                       )}
                     </div>
-                    <div className="setup-plan">
-                      <div>
-                        <span>Entry</span>
-                        <strong>{plan ? price(plan.entry) : "—"}</strong>
-                      </div>
-                      <div>
-                        <span>Stop loss</span>
-                        <strong>{plan ? price(plan.stop) : "—"}</strong>
-                      </div>
-                      <div>
-                        <span>Take profit · 3R gross</span>
-                        <strong>{plan ? price(plan.target) : "—"}</strong>
-                      </div>
-                      <div>
-                        <span>Net RR</span>
-                        <strong className={plan ? "positive" : ""}>
-                          {plan ? `${plan.netRR.toFixed(2)}R` : "—"}
-                        </strong>
-                      </div>
-                    </div>
-                    <button
-                      className="button setup-cta"
-                      onClick={() => openRisk(plan)}
-                    >
-                      <ShieldCheck size={15} />
-                      {plan
-                        ? eligible
-                          ? "Review candidate risk"
-                          : "Inspect filtered scenario"
-                        : "Open risk calculator"}
-                      <ArrowRight size={15} />
-                    </button>
-                    <p className="setup-footnote">
-                      {eligible
-                        ? "Not an order. Portfolio risk and actual fill conditions require your review."
-                        : "No complete setup, no suggested trade."}
-                    </p>
+                    <TradePlanCard
+                      view={tradePlan}
+                      onOpenRisk={() => openRisk(plan)}
+                      onOpenJournal={() => {
+                        setView("journal");
+                        window.scrollTo({ top: 0, behavior: "instant" });
+                      }}
+                    />
                   </aside>
                 </div>
               )}
