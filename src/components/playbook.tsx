@@ -146,6 +146,29 @@ export function Playbook() {
           </ul>
         </div>
       </div>
+      <div className="panel playbook-trade-plan-note">
+        <div className="panel-heading">
+          <h2>
+            <FlaskConical size={17} /> Trade Plan Analytics
+          </h2>
+        </div>
+        <ul className="rule-list">
+          <li>
+            The desk packages existing analyze() gates, levels, net RR and a
+            default $100 / 0.25% size scenario into one Trade Plan card.
+          </li>
+          <li>
+            <strong>Trade Plan Analytics ≠ ARMED ≠ live order.</strong> A
+            packaged plan is research packaging only. It never connects a
+            wallet, never POSTs an order, and never merges company-law or LIVE
+            venue actions.
+          </li>
+          <li>
+            Journal seed writes a localStorage draft only. Export JSON/CSV is a
+            snapshot for your notes — not execution evidence.
+          </li>
+        </ul>
+      </div>
       <div className="source-links">
         <span>Primary sources</span>
         <a

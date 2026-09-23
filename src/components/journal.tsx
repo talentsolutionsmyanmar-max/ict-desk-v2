@@ -11,6 +11,11 @@ import {
 import { JournalTrade } from "@/lib/types";
 import { journalResult } from "@/lib/math";
 import { money, price } from "@/lib/format";
+import {
+  clearJournalDraft,
+  readJournalDraft,
+  type JournalDraft,
+} from "@/lib/trade-plan";
 
 const KEY = "ict-edge-journal-v1";
 const localTime = () => {
@@ -25,7 +30,14 @@ export function Journal({ coin }: { coin: string }) {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState("");
   const [storageError, setStorageError] = useState("");
+  const [draft, setDraft] = useState<JournalDraft | null>(null);
   useEffect(() => {
+    const seeded = readJournalDraft();
+    if (seeded) {
+      setDraft(seeded);
+      setOpen(true);
+      clearJournalDraft();
+    }
     try {
       const parsed = JSON.parse(localStorage.getItem(KEY) ?? "[]");
       if (!Array.isArray(parsed) || parsed.length > 5000)
@@ -82,6 +94,7 @@ export function Journal({ coin }: { coin: string }) {
       localStorage.setItem(KEY, JSON.stringify(next));
       setTrades(next);
       setOpen(false);
+      setDraft(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not save this trade.");
     }
@@ -211,29 +224,42 @@ export function Journal({ coin }: { coin: string }) {
       {open && (
         <div className="panel journal-form">
           <div className="panel-heading">
-            <h2>Record a completed trade</h2>
+            <h2>
+              {draft?.researchOnly
+                ? "Finish research journal draft"
+                : "Record a completed trade"}
+            </h2>
             <button
               className="icon-button"
               aria-label="Close trade form"
-              onClick={() => setOpen(false)}
+              onClick={() => {
+                setOpen(false);
+                setDraft(null);
+              }}
             >
               <X size={18} />
             </button>
           </div>
-          <form onSubmit={save}>
+          {draft?.researchOnly && (
+            <p className="field-note">
+              Prefills from Trade Plan Analytics. Still not an order — enter
+              actual exit, fees and funding after a real closed trade.
+            </p>
+          )}
+          <form key={draft?.seededAt ?? "manual"} onSubmit={save}>
             <div className="form-grid three">
               <label className="form-field">
                 <span>Market symbol</span>
                 <input
                   name="coin"
-                  defaultValue={coin}
+                  defaultValue={draft?.coin ?? coin}
                   required
                   maxLength={24}
                 />
               </label>
               <label className="form-field">
                 <span>Direction</span>
-                <select name="direction">
+                <select name="direction" defaultValue={draft?.direction ?? "long"}>
                   <option value="long">Long</option>
                   <option value="short">Short</option>
                 </select>
@@ -246,6 +272,7 @@ export function Journal({ coin }: { coin: string }) {
                   type="number"
                   min="0.00000001"
                   step="any"
+                  defaultValue={draft?.quantity ?? ""}
                 />
               </label>
               {(
@@ -272,7 +299,8 @@ export function Journal({ coin }: { coin: string }) {
                     }
                     step="any"
                     defaultValue={
-                      name === "fees" || name === "funding" ? "0" : undefined
+                      draft?.[name] ??
+                      (name === "fees" || name === "funding" ? "0" : undefined)
                     }
                   />
                 </label>
@@ -283,7 +311,7 @@ export function Journal({ coin }: { coin: string }) {
                   name="openedAt"
                   type="datetime-local"
                   required
-                  defaultValue={localTime()}
+                  defaultValue={draft?.openedAt ?? localTime()}
                 />
               </label>
               <label className="form-field">
@@ -292,7 +320,7 @@ export function Journal({ coin }: { coin: string }) {
                   name="closedAt"
                   type="datetime-local"
                   required
-                  defaultValue={localTime()}
+                  defaultValue={draft?.closedAt ?? localTime()}
                 />
               </label>
             </div>
@@ -303,6 +331,7 @@ export function Journal({ coin }: { coin: string }) {
                 rows={2}
                 maxLength={2000}
                 placeholder="Setup, fill quality, rule deviations…"
+                defaultValue={draft?.notes ?? ""}
               />
             </label>
             <p className="field-note">
