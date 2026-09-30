@@ -43,6 +43,7 @@ export interface Book {
   bidDepth10bps: number;
   askDepth10bps: number;
 }
+export type { VolumeProfile } from "./volume-profile";
 export interface Gate {
   id: string;
   label: string;
@@ -109,6 +110,7 @@ export interface Analysis {
   liquid: boolean;
   ready: boolean;
   session: Session;
+  volumeProfile?: import("./volume-profile").VolumeProfile | null;
   research?: ResearchModel[];
 }
 export type ResearchModelId = "continuation" | "reversal" | "breakout";

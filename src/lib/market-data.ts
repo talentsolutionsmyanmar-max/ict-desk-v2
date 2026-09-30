@@ -1,6 +1,7 @@
 import { analyze, blockedAnalysis, STRATEGY_VERSION } from "./strategy";
 import { analyzeAdaptive, ADAPTIVE_VERSION } from "./adaptive-strategy";
 import { replayResearch } from "./research-replay";
+import { buildVolumeProfile } from "./volume-profile";
 import {
   Book,
   Candle,
@@ -302,6 +303,7 @@ export async function getScan(): Promise<ScanSnapshot> {
                 { five, fifteen, fourHour, book },
                 Date.now(),
               );
+              analyses[i].volumeProfile = buildVolumeProfile(five, analyses[i].evaluatedAt);
               analyses[i].research = analyzeAdaptive(
                 m,
                 { five, fifteen, fourHour, book },

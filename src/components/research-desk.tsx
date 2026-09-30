@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { Activity, ArrowRight, FlaskConical } from "lucide-react";
-import { Book, Candle, Market, Plan, ResearchModel } from "@/lib/types";
+import { Book, Candle, Market, Plan, ResearchModel, VolumeProfile } from "@/lib/types";
 import { ContextMetrics } from "@/lib/market-context";
 import { researchLifecycle } from "@/lib/research-strategy";
 import { quoteFresh, RULES } from "@/lib/strategy";
@@ -35,6 +35,7 @@ export function ResearchDesk({
   models,
   context,
   book,
+  volumeProfile,
   signalCandle,
   now,
   dataReady,
@@ -46,6 +47,7 @@ export function ResearchDesk({
   models?: ResearchModel[];
   context: ContextMetrics;
   book: Book | null;
+  volumeProfile: VolumeProfile | null;
   signalCandle: Candle | null;
   now: number;
   dataReady: boolean;
@@ -135,6 +137,15 @@ export function ResearchDesk({
         <span>Alerts are local to this browser and require this tab to be open.</span>
       </div>
       <div className="context-grid" aria-label="Live positioning context">
+        {volumeProfile && (
+          <div>
+            <span>Session value · POC / VAH / VAL</span>
+            <strong>{price(volumeProfile.poc)}</strong>
+            <small>
+              {price(volumeProfile.vah)} / {price(volumeProfile.val)} · {volumeProfile.location.replace("-", " ")}
+            </small>
+          </div>
+        )}
         <div>
           <span>Open interest · observed base-unit change</span>
           <strong>

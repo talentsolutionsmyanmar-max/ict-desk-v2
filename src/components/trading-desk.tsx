@@ -586,6 +586,7 @@ export function TradingDesk() {
                   market={market}
                   models={analysis?.research}
                   context={feed.context}
+                  volumeProfile={analysis?.volumeProfile ?? null}
                   book={book}
                   signalCandle={feed.signalCandle}
                   now={now}
