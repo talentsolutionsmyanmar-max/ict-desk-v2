@@ -17,7 +17,7 @@ import {
   Radio,
   TriangleAlert,
 } from "lucide-react";
-import { Candle, Interval, Plan } from "@/lib/types";
+import { Candle, Interval, Plan, VolumeProfile } from "@/lib/types";
 import { price } from "@/lib/format";
 
 export function MarketChart({
@@ -26,6 +26,7 @@ export function MarketChart({
   interval,
   onInterval,
   plan,
+  volumeProfile,
   error,
 }: {
   coin: string;
@@ -33,6 +34,7 @@ export function MarketChart({
   interval: Interval;
   onInterval: (i: Interval) => void;
   plan: Plan | null;
+  volumeProfile: VolumeProfile | null;
   error: string | null;
 }) {
   const host = useRef<HTMLDivElement>(null);
@@ -181,6 +183,37 @@ export function MarketChart({
     ];
     return () => lines.forEach((line) => current.removePriceLine(line));
   }, [plan]);
+  useEffect(() => {
+    if (!series.current || !volumeProfile) return;
+    const current = series.current;
+    const lines = [
+      current.createPriceLine({
+        price: volumeProfile.poc,
+        color: "#d5b36c",
+        lineWidth: 2,
+        lineStyle: LineStyle.Solid,
+        axisLabelVisible: true,
+        title: "POC",
+      }),
+      current.createPriceLine({
+        price: volumeProfile.vah,
+        color: "#a88bd4",
+        lineWidth: 1,
+        lineStyle: LineStyle.Dashed,
+        axisLabelVisible: true,
+        title: "VAH",
+      }),
+      current.createPriceLine({
+        price: volumeProfile.val,
+        color: "#a88bd4",
+        lineWidth: 1,
+        lineStyle: LineStyle.Dashed,
+        axisLabelVisible: true,
+        title: "VAL",
+      }),
+    ];
+    return () => lines.forEach((line) => current.removePriceLine(line));
+  }, [volumeProfile]);
   const candle = hover ?? candles.at(-1);
   return (
     <div className="chart-area" ref={panel}>
@@ -198,7 +231,7 @@ export function MarketChart({
           ))}
         </div>
         <span className="chart-type">
-          Candles <span>·</span> Volume
+          Candles <span>·</span> Volume <span>·</span> Value profile
         </span>
         <div className="chart-actions">
           <button
@@ -254,8 +287,16 @@ export function MarketChart({
         ref={host}
         className="chart-canvas"
         role="img"
-        aria-label={`${coin} ${interval} candlestick price chart, with volume. Candle data is available below.`}
+        aria-label={`${coin} ${interval} candlestick price chart with volume and session value profile POC VAH VAL. Candle data is available below.`}
       />
+      {volumeProfile && (
+        <div className="chart-profile-legend" aria-label="Session volume profile levels">
+          <span className="profile-poc">POC {price(volumeProfile.poc)}</span>
+          <span className="profile-value">VAH {price(volumeProfile.vah)}</span>
+          <span className="profile-value">VAL {price(volumeProfile.val)}</span>
+          <span className="profile-location">{volumeProfile.location.replace("-", " ")}</span>
+        </div>
+      )}
       {candles.length === 0 && (
         <div className="chart-overlay">
           {error ? (

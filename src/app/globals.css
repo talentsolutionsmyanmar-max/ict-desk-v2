@@ -1554,6 +1554,32 @@ h1 {
   font-size: 0.62rem;
   letter-spacing: 0.08em;
 }
+
+.chart-profile-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+  padding: 0.45rem 0.7rem;
+  border-top: 1px solid #25342b;
+  background: #0c1210;
+  color: var(--muted);
+  font: 0.68rem/1.2 ui-monospace, SFMono-Regular, monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.chart-profile-legend .profile-poc {
+  color: #d5b36c;
+}
+
+.chart-profile-legend .profile-value {
+  color: #b99be5;
+}
+
+.chart-profile-legend .profile-location {
+  margin-left: auto;
+  color: var(--text);
+}
 .scanner-panel {
   margin-bottom: 20px;
 }

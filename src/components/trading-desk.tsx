@@ -680,6 +680,7 @@ export function TradingDesk() {
                       interval={interval}
                       onInterval={setInterval}
                       plan={plan}
+                      volumeProfile={analysis?.volumeProfile ?? null}
                       error={feed.chartError}
                     />
                     <div className="execution-strip">
